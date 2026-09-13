@@ -1,0 +1,59 @@
+# Push a tag like v1.16.0.2 -> build sdist + wheel -> publish to PyPI (trusted publishing,
+# no tokens) -> attach the wheel to a GitHub Release.
+#
+# One-time setup on pypi.org: Your account -> Publishing -> Add a new pending publisher:
+#   PyPI project name: skeltahtls | Owner: <github user> | Repository: skeltahtls
+#   Workflow name: release.yml | Environment: pypi
+# and in GitHub: Settings -> Environments -> New environment "pypi".
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: Check version matches tag
+        run: |
+          v=$(python -c "import skeltahtls; print(skeltahtls.__version__)")
+          test "v$v" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != package version $v"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

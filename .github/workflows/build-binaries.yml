@@ -1,0 +1,75 @@
+# Rebuild the tls-client shared libraries from a bogdanfinn/tls-client tag.
+# Linux + Windows are cross compiled with zig on ubuntu; macOS is built natively.
+# Result: a branch "binaries/<tag>" with the new files + manifest - open a PR from it,
+# run scripts/gen_profiles.py and check the Chrome defaults / test hashes before merging.
+name: Build binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "bogdanfinn/tls-client tag (e.g. v1.16.0)"
+        required: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            targets: windows-amd64 windows-386 linux-amd64 linux-musl-amd64 linux-arm64 linux-armv7
+          - os: macos-latest
+            targets: darwin-arm64 darwin-amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      - uses: mlugg/setup-zig@v2
+        if: runner.os == 'Linux'
+        with:
+          version: "0.16.0"
+      - run: python3 scripts/build_binaries.py ${{ inputs.tag }} ${{ matrix.targets }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.os }}
+          path: |
+            skeltahtls/dependencies/*.dll
+            skeltahtls/dependencies/*.so
+            skeltahtls/dependencies/*.dylib
+            skeltahtls/dependencies/manifest.json
+
+  commit:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Merge artifacts and manifests
+        run: |
+          python3 - <<'PY'
+          import json, shutil, pathlib
+          dep = pathlib.Path("skeltahtls/dependencies")
+          manifest = json.loads((dep / "manifest.json").read_text())
+          for art in pathlib.Path("artifacts").iterdir():
+              part = json.loads((art / "manifest.json").read_text())
+              manifest["files"].update(part["files"])
+              manifest.update({k: part[k] for k in ("version", "source", "updated")})
+              for f in art.iterdir():
+                  if f.suffix in (".dll", ".so", ".dylib"):
+                      shutil.copyfile(f, dep / f.name)
+          (dep / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+      - name: Push branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "binaries/${{ inputs.tag }}"
+          git add skeltahtls/dependencies
+          git commit -m "Rebuild tls-client binaries from ${{ inputs.tag }}"
+          git push -u origin "binaries/${{ inputs.tag }}"

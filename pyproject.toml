@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skeltahtls"
+dynamic = ["version"]
+description = "Python HTTP client with up-to-date Chrome TLS/HTTP2 fingerprints (bogdanfinn/tls-client bindings)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
+authors = [{ name = "skeltah" }]
+keywords = ["tls", "fingerprint", "ja3", "ja4", "http2", "chrome", "scraping", "tls-client"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
+[project.urls]
+Homepage = "https://github.com/skeltah/skeltahtls"
+Source = "https://github.com/skeltah/skeltahtls"
+Issues = "https://github.com/skeltah/skeltahtls/issues"
+Upstream = "https://github.com/bogdanfinn/tls-client"
+
+[project.optional-dependencies]
+charset = ["charset_normalizer>=3"]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+packages = ["skeltahtls", "skeltahtls.async_client"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = { attr = "skeltahtls.__version__.__version__" }
+
+[tool.setuptools.package-data]
+skeltahtls = ["dependencies/*.dll", "dependencies/*.so", "dependencies/*.dylib", "dependencies/manifest.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: talks to tls.peet.ws / httpbin.org"]

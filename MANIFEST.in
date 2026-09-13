@@ -1,0 +1,2 @@
+include README.md LICENSE LICENSE.tls_client
+recursive-include skeltahtls/dependencies *.dll *.so *.dylib manifest.json

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e . pytest
+      - name: Unit tests (offline)
+        run: pytest -m "not network"
+      - name: Library loads on this platform
+        run: python -c "import skeltahtls, skeltahtls._cffi as c; c._load(); print(skeltahtls.library_version(), skeltahtls.library_features())"
+      - name: Fingerprint tests (network, best effort)
+        continue-on-error: true
+        run: pytest -m network
