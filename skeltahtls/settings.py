@@ -1,2 +1,2 @@
 """Compatibility shim for the tls_client layout (``from skeltahtls.settings import ClientIdentifiers``)."""
-from .profiles import ClientIdentifiers  # noqa: F401
+from .profiles import ClientIdentifier, ClientIdentifiers, Profiles  # noqa: F401

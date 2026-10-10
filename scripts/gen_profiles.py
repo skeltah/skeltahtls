@@ -2,10 +2,10 @@
 
     python scripts/gen_profiles.py v1.16.0
 
-Only the generated head (``ClientIdentifiers`` literal, the ``*_LATEST`` constants and the
-h3 profile sets) is rewritten; everything below the marker line (Chrome defaults for custom
-clients) is kept as is - review it by hand when a new Chrome profile lands
-(profiles/internal_browser_profiles.go).
+Only the generated head (``ClientIdentifiers`` literal, the ``Profiles`` namespace, the
+``*_LATEST`` constants and the h3 profile sets) is rewritten; everything below the marker
+line (Chrome defaults for custom clients) is kept as is - review it by hand when a new
+Chrome profile lands (profiles/internal_browser_profiles.go).
 """
 from __future__ import annotations
 
@@ -80,8 +80,15 @@ def main() -> int:
         "Generated from bogdanfinn/tls-client by scripts/gen_profiles.py - do not hand-edit",
         "anything above the marker line.",
         '"""',
-        "from typing import FrozenSet, Literal, Tuple",
+        "import difflib",
+        "from typing import FrozenSet, List, Literal, Tuple, Union",
         "",
+        "try:  # Final narrows these to Literal types, so they satisfy ClientIdentifiers",
+        "    from typing import Final",
+        "except ImportError:  # pragma: no cover",
+        "    from typing_extensions import Final  # type: ignore[assignment]",
+        "",
+        "# Accepted values of Session(client_identifier=...). Editors complete these.",
         "ClientIdentifiers = Literal[",
     ]
     for group, identifiers in grouped.items():
@@ -90,12 +97,16 @@ def main() -> int:
     head += [
         "]",
         "",
+        "# Same thing, permissive: use it for a profile name that only exists at runtime",
+        "# (read from a config file, say). Validated against ALL_IDENTIFIERS either way.",
+        "ClientIdentifier = Union[ClientIdentifiers, str]",
+        "",
         "ALL_IDENTIFIERS: Tuple[str, ...] = ClientIdentifiers.__args__  # type: ignore[attr-defined]",
         "",
-        f'CHROME_LATEST = "{chrome}"',
-        f'CHROME_LATEST_PSK = "{chrome}_PSK"',
-        f'FIREFOX_LATEST = "{firefox}"',
-        "DEFAULT_PROFILE = CHROME_LATEST",
+        f'CHROME_LATEST: Final = "{chrome}"',
+        f'CHROME_LATEST_PSK: Final = "{chrome}_PSK"',
+        f'FIREFOX_LATEST: Final = "{firefox}"',
+        "DEFAULT_PROFILE: Final = CHROME_LATEST",
         "",
         "# Profiles whose ClientHello advertises h3 in ALPN/ALPS. disable_http3 (http_version=2)",
         "# strips it and therefore changes their fingerprint.",
@@ -116,8 +127,47 @@ def main() -> int:
         'SAFARI_PSEUDO_HEADER_ORDER = (":method", ":scheme", ":path", ":authority")',
         "",
         "",
+        "class Profiles:",
+        '    """Every built-in profile as an attribute, so `Profiles.` lists them in any editor.',
+        "",
+        "        Session(client_identifier=Profiles.CHROME_152)",
+        "        Session(client_identifier=Profiles.LATEST_CHROME)  # follows the bundled library",
+        '    """',
+        "",
+        "    LATEST_CHROME: Final = CHROME_LATEST",
+        "    LATEST_CHROME_PSK: Final = CHROME_LATEST_PSK",
+        "    LATEST_FIREFOX: Final = FIREFOX_LATEST",
+        "",
+    ]
+    for group, identifiers in grouped.items():
+        head.append(f"    # {group}")
+        head += [f'    {i.upper()}: Final = "{i}"' for i in identifiers]
+        head.append("")
+    head += [
+        "",
         "def is_known_identifier(identifier: str) -> bool:",
         "    return identifier in ALL_IDENTIFIERS",
+        "",
+        "",
+        "def find(prefix: str) -> List[str]:",
+        '    """Built-in identifiers starting with `prefix`, e.g. find("chrome_15") or find("firefox").',
+        "",
+        '        >>> find("safari_ios")[-1]',
+        f'        {next(iter([i for i in keys if i.startswith("safari_ios")][-1:]), "")!r}',
+        '    """',
+        "    prefix = prefix.lower()",
+        "    return [i for i in ALL_IDENTIFIERS if i.lower().startswith(prefix)]",
+        "",
+        "",
+        "def suggest(value: str, limit: int = 3) -> List[str]:",
+        '    """Built-in identifiers closest to a misspelt one (for error messages)."""',
+        "    matches = difflib.get_close_matches(value.lower(), ALL_IDENTIFIERS, n=limit, cutoff=0.6)",
+        "    if matches:",
+        "        return matches",
+        "    # \"chrome152\", \"chrome\" -> every chrome_* profile, newest first",
+        "    family = \"\".join(c for c in value.lower() if c.isalpha())",
+        "    same_family = [i for i in ALL_IDENTIFIERS if family and i.startswith(family)]",
+        "    return list(reversed(same_family))[:limit]",
         "",
         "",
         "def builtin_pseudo_header_order(identifier: str) -> Tuple[str, ...]:",

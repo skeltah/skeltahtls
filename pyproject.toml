@@ -39,7 +39,7 @@ include-package-data = true
 version = { attr = "skeltahtls.__version__.__version__" }
 
 [tool.setuptools.package-data]
-skeltahtls = ["dependencies/*.dll", "dependencies/*.so", "dependencies/*.dylib", "dependencies/manifest.json"]
+skeltahtls = ["py.typed", "dependencies/*.dll", "dependencies/*.so", "dependencies/*.dylib", "dependencies/manifest.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

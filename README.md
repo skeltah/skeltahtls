@@ -17,7 +17,7 @@ r.json()["tls"]["ja4"]                         # t13d1517h2_8daaf6152771_cb7bf58
 ```bash
 pip install skeltahtls                                                # PyPI
 pip install git+https://github.com/skeltah/skeltahtls.git             # прямо из репозитория (нужен git)
-pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.3   # конкретная версия
+pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.4   # конкретная версия
 pip install -e .                                                      # dev-режим из клона
 ```
 
@@ -40,6 +40,7 @@ Wheel один на все платформы (~40 МБ, бинарники вн
 | `certCompressionAlgo`, `withDefaultCookieJar`, `additionalDecode` — устаревшие ключи API | Актуальные ключи v1.16: `certCompressionAlgos`, `withCustomCookieJar`, `timeoutMilliseconds`, `disableHttp3`, `disableSessionTickets`, `requestHostOverride`, `trustAnchorsPayload`, ... |
 | `pseudo_header_order` с профилем — тихо игнорировался | Профили содержат свой порядок (Chrome: `m,a,s,p`); несовпадающий → ошибка сразу |
 | Зависимость от `requests` (только ради `HTTPError`) | Без зависимостей |
+| `client_identifier: str`, пакет без `py.typed` → ни автодополнения, ни проверки; опечатка = молчаливый откат на дефолтный профиль Go | `Literal` из 83 профилей + `py.typed` + `Profiles.<Tab>` + `find()`; опечатка → ошибка с ближайшими вариантами |
 | Невалидные комбинации опций (racing + force_http1, racing с http-прокси, ipv4+ipv6 off, pinning + verify=False) доходили до Go, который сохранял `nil`-клиент, и `close()` **ронял процесс** Go-паникой | Проверяются в Python до запроса → `SessionConfigurationError`; плюс сломанная Go-сессия больше никогда не передаётся в `destroySession` |
 | Версия транспорта — три разрозненных булевых флага | `http_version="auto"/"1.1"/"2"/"3"`, меняется между запросами; `r.http_version` показывает фактическую |
 
@@ -66,6 +67,42 @@ Transport-опции (`force_http1`, `client_identifier`, `random_tls_extension_
 `disable_http3`, `disable_session_tickets`, `server_name_overwrite`, `local_address`, ...) можно менять
 между запросами как атрибуты — следующий запрос откроет новое соединение с новыми параметрами.
 `s.reset_connection()` принудительно делает новый TLS-handshake.
+
+### Профили (подсказки в IDE)
+
+`client_identifier` типизирован как `Literal` из 83 встроенных профилей, и пакет помечен
+`py.typed` — поэтому VS Code / PyCharm / mypy показывают список значений прямо при вводе
+аргумента и подсвечивают опечатку. Те же строки доступны атрибутами:
+
+```python
+from skeltahtls import Session, Profiles, ALL_IDENTIFIERS, find
+
+Session(client_identifier="chrome_152")            # автодополнение по вводу кавычки
+Session(client_identifier=Profiles.CHROME_144)     # Profiles.<Tab> — весь список
+Session(client_identifier=Profiles.LATEST_CHROME)  # следует за версией библиотеки
+
+find("chrome_15")   # ['chrome_150', 'chrome_150_PSK', 'chrome_152', 'chrome_152_PSK']
+find("safari_ios")  # все iOS-профили
+ALL_IDENTIFIERS     # кортеж из всех 83
+```
+
+Семейства: `chrome_103..152` (+`_PSK` — возобновление сессии по pre-shared key), `brave_146`,
+`firefox_102..148`, `safari_15_6_1`/`safari_16_0`, `safari_ios_*`/`safari_ipad_*`,
+`opera_89..91`, `okhttp4_android_7..13`, плюс прикладные (`zalando_*`, `nike_*`, `mms_ios*`,
+`mesh_*`, `confirmed_*`, `cloudscraper`).
+
+Опечатка ловится и в рантайме — с ближайшими вариантами:
+
+```
+SessionConfigurationError: unknown client_identifier 'chrome152';
+  did you mean: 'chrome_152', 'chrome_150', 'chrome_124'?;
+  newest built-in profiles: 'chrome_152' (default), 'chrome_152_PSK', 'firefox_148';
+  all of them: skeltahtls.ALL_IDENTIFIERS, skeltahtls.Profiles.<TAB>, or skeltahtls.profiles.find("chrome")
+```
+
+Имя профиля из конфига (обычная `str`) работает как раньше; строгий тип нужен только для
+подсказок, так что для динамического значения добавьте `cast(ClientIdentifiers, name)` или
+`# type: ignore[arg-type]`.
 
 ### Версия транспорта
 

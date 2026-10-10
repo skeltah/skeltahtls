@@ -8,7 +8,7 @@ import urllib.parse
 import uuid
 import warnings
 from datetime import timedelta
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Tuple, Union
 from urllib.parse import urljoin
 
 from . import _cffi
@@ -16,7 +16,12 @@ from .cookiejar import CookieInput, CookieJar
 from .cookies import MockRequest, extract_cookies_to_jar
 from .exceptions import SessionConfigurationError, TLSClientException
 from . import profiles as _profiles
-from .profiles import DEFAULT_PROFILE, builtin_pseudo_header_order, is_known_identifier
+from .profiles import (
+    DEFAULT_PROFILE,
+    ClientIdentifiers,
+    builtin_pseudo_header_order,
+    is_known_identifier,
+)
 from .response import Response, build_response
 from .structures import CaseInsensitiveDict
 
@@ -41,6 +46,18 @@ _HTTP_VERSION_ALIASES: Dict[Any, str] = {
     2: "2", "2": "2", "h2": "2", "http2": "2", "http/2": "2",
     3: "3", "3": "3", "h3": "3", "http3": "3", "http/3": "3", "quic": "3",
 }
+
+
+# Everything http_version accepts. Editors complete these.
+HttpVersionArg = Literal[
+    "auto", "1.1", "2", "3",
+    1, 2, 3,
+    "1", "h1", "h2", "h3",
+    "http/1.1", "http/2", "http/3",
+    "http1", "http2", "http3",
+    "quic", "negotiate",
+    None,
+]
 
 
 def normalize_http_version(value: Any) -> str:
@@ -72,10 +89,38 @@ _TRANSPORT_FIELDS = (
 ) + CUSTOM_TLS_FIELDS
 
 
+def unknown_identifier_message(value: Any) -> str:
+    """Error text for a profile name that does not exist, with the nearest ones."""
+    lines = [f"unknown client_identifier {value!r}"]
+    close = _profiles.suggest(str(value))
+    if close:
+        lines.append("did you mean: " + ", ".join(repr(c) for c in close) + "?")
+    lines.append(f"newest built-in profiles: {_profiles.CHROME_LATEST!r} (default), "
+                 f"{_profiles.CHROME_LATEST_PSK!r}, {_profiles.FIREFOX_LATEST!r}")
+    lines.append("all of them: skeltahtls.ALL_IDENTIFIERS, skeltahtls.Profiles.<TAB>, "
+                 'or skeltahtls.profiles.find("chrome")')
+    return "; ".join(lines)
+
+
 class Session:
     """requests-like session with a browser TLS/HTTP2 fingerprint.
 
-    Default profile is the newest Chrome bundled with the library (see skeltahtls.CHROME_LATEST).
+    ``client_identifier`` is one of the profiles built into the bundled tls-client library;
+    editors complete the values because it is typed as a Literal. The default is the newest
+    Chrome (``skeltahtls.CHROME_LATEST``, currently chrome_152)::
+
+        Session()                                        # newest Chrome
+        Session(client_identifier="firefox_148")
+        Session(client_identifier=Profiles.CHROME_144)   # same strings as attributes
+        Session(client_identifier=Profiles.LATEST_CHROME)
+
+    Families: ``chrome_103..152`` (``_PSK`` variants resume with a pre-shared key),
+    ``brave_146``, ``firefox_102..148``, ``safari_15_6_1``/``safari_16_0``,
+    ``safari_ios_*``/``safari_ipad_*``, ``opera_89..91``, ``okhttp4_android_7..13`` and the
+    app profiles (``zalando_*``, ``nike_*``, ``mms_ios*``, ``mesh_*``, ``confirmed_*``,
+    ``cloudscraper``). The full list is ``skeltahtls.ALL_IDENTIFIERS`` /
+    ``skeltahtls.Profiles``; ``skeltahtls.profiles.find("chrome_15")`` filters it.
+
     Pass ``client_identifier=None`` together with ``ja3_string`` / ``h2_settings`` / ... to
     build a fully custom fingerprint instead.
     """
@@ -84,7 +129,7 @@ class Session:
 
     def __init__(
         self,
-        client_identifier: Optional[str] = _UNSET,
+        client_identifier: Optional[ClientIdentifiers] = _UNSET,
         *,
         # --- custom fingerprint (only when client_identifier is None) -------------------------------
         ja3_string: Optional[str] = None,
@@ -111,7 +156,7 @@ class Session:
         # --- request shaping -------------------------------------------------------------------------
         header_order: Optional[Sequence[str]] = None,
         random_tls_extension_order: bool = True,
-        http_version: Any = _UNSET,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
         force_http1: bool = False,
         disable_http3: bool = False,
         disable_session_tickets: bool = False,
@@ -164,9 +209,7 @@ class Session:
         if client_identifier is None and ja3_string is None:
             raise SessionConfigurationError("client_identifier=None requires at least a ja3_string")
         if client_identifier is not None and not is_known_identifier(client_identifier):
-            raise SessionConfigurationError(
-                f"unknown client_identifier {client_identifier!r}; see skeltahtls.profiles.ALL_IDENTIFIERS"
-            )
+            raise SessionConfigurationError(unknown_identifier_message(client_identifier))
 
         if pseudo_header_order is not None and client_identifier is not None:
             builtin = builtin_pseudo_header_order(client_identifier)

@@ -3,8 +3,15 @@
 Generated from bogdanfinn/tls-client by scripts/gen_profiles.py - do not hand-edit
 anything above the marker line.
 """
-from typing import FrozenSet, Literal, Tuple
+import difflib
+from typing import FrozenSet, List, Literal, Tuple, Union
 
+try:  # Final narrows these to Literal types, so they satisfy ClientIdentifiers
+    from typing import Final
+except ImportError:  # pragma: no cover
+    from typing_extensions import Final  # type: ignore[assignment]
+
+# Accepted values of Session(client_identifier=...). Editors complete these.
 ClientIdentifiers = Literal[
     # chrome
     "chrome_103",
@@ -103,12 +110,16 @@ ClientIdentifiers = Literal[
     "okhttp4_android_13",
 ]
 
+# Same thing, permissive: use it for a profile name that only exists at runtime
+# (read from a config file, say). Validated against ALL_IDENTIFIERS either way.
+ClientIdentifier = Union[ClientIdentifiers, str]
+
 ALL_IDENTIFIERS: Tuple[str, ...] = ClientIdentifiers.__args__  # type: ignore[attr-defined]
 
-CHROME_LATEST = "chrome_152"
-CHROME_LATEST_PSK = "chrome_152_PSK"
-FIREFOX_LATEST = "firefox_148"
-DEFAULT_PROFILE = CHROME_LATEST
+CHROME_LATEST: Final = "chrome_152"
+CHROME_LATEST_PSK: Final = "chrome_152_PSK"
+FIREFOX_LATEST: Final = "firefox_148"
+DEFAULT_PROFILE: Final = CHROME_LATEST
 
 # Profiles whose ClientHello advertises h3 in ALPN/ALPS. disable_http3 (http_version=2)
 # strips it and therefore changes their fingerprint.
@@ -134,8 +145,148 @@ FIREFOX_PSEUDO_HEADER_ORDER = (":method", ":path", ":authority", ":scheme")
 SAFARI_PSEUDO_HEADER_ORDER = (":method", ":scheme", ":path", ":authority")
 
 
+class Profiles:
+    """Every built-in profile as an attribute, so `Profiles.` lists them in any editor.
+
+        Session(client_identifier=Profiles.CHROME_152)
+        Session(client_identifier=Profiles.LATEST_CHROME)  # follows the bundled library
+    """
+
+    LATEST_CHROME: Final = CHROME_LATEST
+    LATEST_CHROME_PSK: Final = CHROME_LATEST_PSK
+    LATEST_FIREFOX: Final = FIREFOX_LATEST
+
+    # chrome
+    CHROME_103: Final = "chrome_103"
+    CHROME_104: Final = "chrome_104"
+    CHROME_105: Final = "chrome_105"
+    CHROME_106: Final = "chrome_106"
+    CHROME_107: Final = "chrome_107"
+    CHROME_108: Final = "chrome_108"
+    CHROME_109: Final = "chrome_109"
+    CHROME_110: Final = "chrome_110"
+    CHROME_111: Final = "chrome_111"
+    CHROME_112: Final = "chrome_112"
+    CHROME_116_PSK: Final = "chrome_116_PSK"
+    CHROME_116_PSK_PQ: Final = "chrome_116_PSK_PQ"
+    CHROME_117: Final = "chrome_117"
+    CHROME_120: Final = "chrome_120"
+    CHROME_124: Final = "chrome_124"
+    CHROME_130_PSK: Final = "chrome_130_PSK"
+    CHROME_131: Final = "chrome_131"
+    CHROME_131_PSK: Final = "chrome_131_PSK"
+    CHROME_133: Final = "chrome_133"
+    CHROME_133_PSK: Final = "chrome_133_PSK"
+    CHROME_144: Final = "chrome_144"
+    CHROME_144_PSK: Final = "chrome_144_PSK"
+    CHROME_146: Final = "chrome_146"
+    CHROME_146_PSK: Final = "chrome_146_PSK"
+    CHROME_150: Final = "chrome_150"
+    CHROME_150_PSK: Final = "chrome_150_PSK"
+    CHROME_152: Final = "chrome_152"
+    CHROME_152_PSK: Final = "chrome_152_PSK"
+
+    # brave
+    BRAVE_146: Final = "brave_146"
+    BRAVE_146_PSK: Final = "brave_146_PSK"
+
+    # safari
+    SAFARI_15_6_1: Final = "safari_15_6_1"
+    SAFARI_16_0: Final = "safari_16_0"
+    SAFARI_IPAD_15_6: Final = "safari_ipad_15_6"
+    SAFARI_IOS_15_5: Final = "safari_ios_15_5"
+    SAFARI_IOS_15_6: Final = "safari_ios_15_6"
+    SAFARI_IOS_16_0: Final = "safari_ios_16_0"
+    SAFARI_IOS_17_0: Final = "safari_ios_17_0"
+    SAFARI_IOS_18_0: Final = "safari_ios_18_0"
+    SAFARI_IOS_18_5: Final = "safari_ios_18_5"
+    SAFARI_IOS_26_0: Final = "safari_ios_26_0"
+
+    # firefox
+    FIREFOX_102: Final = "firefox_102"
+    FIREFOX_104: Final = "firefox_104"
+    FIREFOX_105: Final = "firefox_105"
+    FIREFOX_106: Final = "firefox_106"
+    FIREFOX_108: Final = "firefox_108"
+    FIREFOX_110: Final = "firefox_110"
+    FIREFOX_117: Final = "firefox_117"
+    FIREFOX_120: Final = "firefox_120"
+    FIREFOX_123: Final = "firefox_123"
+    FIREFOX_132: Final = "firefox_132"
+    FIREFOX_133: Final = "firefox_133"
+    FIREFOX_135: Final = "firefox_135"
+    FIREFOX_146_PSK: Final = "firefox_146_PSK"
+    FIREFOX_147: Final = "firefox_147"
+    FIREFOX_147_PSK: Final = "firefox_147_PSK"
+    FIREFOX_148: Final = "firefox_148"
+
+    # opera
+    OPERA_89: Final = "opera_89"
+    OPERA_90: Final = "opera_90"
+    OPERA_91: Final = "opera_91"
+
+    # zalando
+    ZALANDO_ANDROID_MOBILE: Final = "zalando_android_mobile"
+    ZALANDO_IOS_MOBILE: Final = "zalando_ios_mobile"
+
+    # nike
+    NIKE_IOS_MOBILE: Final = "nike_ios_mobile"
+    NIKE_ANDROID_MOBILE: Final = "nike_android_mobile"
+
+    # cloudscraper
+    CLOUDSCRAPER: Final = "cloudscraper"
+
+    # mms
+    MMS_IOS: Final = "mms_ios"
+    MMS_IOS_1: Final = "mms_ios_1"
+    MMS_IOS_2: Final = "mms_ios_2"
+    MMS_IOS_3: Final = "mms_ios_3"
+
+    # mesh
+    MESH_IOS: Final = "mesh_ios"
+    MESH_IOS_1: Final = "mesh_ios_1"
+    MESH_IOS_2: Final = "mesh_ios_2"
+    MESH_ANDROID: Final = "mesh_android"
+    MESH_ANDROID_1: Final = "mesh_android_1"
+    MESH_ANDROID_2: Final = "mesh_android_2"
+
+    # confirmed
+    CONFIRMED_IOS: Final = "confirmed_ios"
+    CONFIRMED_ANDROID: Final = "confirmed_android"
+
+    # okhttp4
+    OKHTTP4_ANDROID_7: Final = "okhttp4_android_7"
+    OKHTTP4_ANDROID_8: Final = "okhttp4_android_8"
+    OKHTTP4_ANDROID_9: Final = "okhttp4_android_9"
+    OKHTTP4_ANDROID_10: Final = "okhttp4_android_10"
+    OKHTTP4_ANDROID_11: Final = "okhttp4_android_11"
+    OKHTTP4_ANDROID_12: Final = "okhttp4_android_12"
+    OKHTTP4_ANDROID_13: Final = "okhttp4_android_13"
+
+
 def is_known_identifier(identifier: str) -> bool:
     return identifier in ALL_IDENTIFIERS
+
+
+def find(prefix: str) -> List[str]:
+    """Built-in identifiers starting with `prefix`, e.g. find("chrome_15") or find("firefox").
+
+        >>> find("safari_ios")[-1]
+        'safari_ios_26_0'
+    """
+    prefix = prefix.lower()
+    return [i for i in ALL_IDENTIFIERS if i.lower().startswith(prefix)]
+
+
+def suggest(value: str, limit: int = 3) -> List[str]:
+    """Built-in identifiers closest to a misspelt one (for error messages)."""
+    matches = difflib.get_close_matches(value.lower(), ALL_IDENTIFIERS, n=limit, cutoff=0.6)
+    if matches:
+        return matches
+    # "chrome152", "chrome" -> every chrome_* profile, newest first
+    family = "".join(c for c in value.lower() if c.isalpha())
+    same_family = [i for i in ALL_IDENTIFIERS if family and i.startswith(family)]
+    return list(reversed(same_family))[:limit]
 
 
 def builtin_pseudo_header_order(identifier: str) -> Tuple[str, ...]:
