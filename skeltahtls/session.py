@@ -27,6 +27,9 @@ from .structures import CaseInsensitiveDict
 
 _UNSET: Any = object()
 
+# "socks5://user:pass@host:port", {"https": "http://..."} or None
+ProxyInput = Union[str, Mapping[str, str], None]
+
 # http_version -> (force_http1, disable_http3, with_protocol_racing)
 HTTP_VERSIONS: Dict[str, Tuple[bool, bool, bool]] = {
     # ALPN as the profile defines it: h2, falling back to http/1.1. Never QUIC.
@@ -595,6 +598,22 @@ class Session:
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
     ) -> Response:
+        """Send a request. The verb methods (``get``, ``post``, ...) call this.
+
+        params           appended to the query string
+        data / json      request body; ``json`` also sets a JSON content-type
+        headers          merged over ``self.headers``; a None value drops that header
+        cookies          added to ``self.cookies`` for this request only (see CookieJar)
+        allow_redirects  follow redirects, keeping cookies and history (default True)
+        verify           verify the server certificate (default ``self.verify``)
+        timeout          seconds; a fractional value is sent as milliseconds
+        proxy / proxies  "socks5://user:pass@host:port" or {"https": ...}; overrides
+                         ``self.proxies`` for this request
+        header_order     order of the request headers; without it the order of the
+                         ``headers`` mapping is used
+        host_override    value of the Host header / :authority when it must differ
+                         from the URL
+        """
         method = method.upper()
         merged_params = {**self.params, **(params or {})} if (self.params or params) else None
         url = self._prepare_url(url, merged_params)
@@ -681,28 +700,307 @@ class Session:
 
     # ------------------------------------------------------------------ verbs
 
-    def request(self, method: str, url: str, **kwargs: Any) -> Response:
-        return self.execute_request(method, url, **kwargs)
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a request with an arbitrary method.
 
-    def get(self, url: str, **kwargs: Any) -> Response:
-        return self.execute_request("GET", url, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            method,
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
-    def options(self, url: str, **kwargs: Any) -> Response:
-        return self.execute_request("OPTIONS", url, **kwargs)
+    def get(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a GET request.
 
-    def head(self, url: str, **kwargs: Any) -> Response:
-        kwargs.setdefault("allow_redirects", False)
-        return self.execute_request("HEAD", url, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "GET",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
-    def post(self, url: str, data: Any = None, json: Any = None, **kwargs: Any) -> Response:
-        return self.execute_request("POST", url, data=data, json=json, **kwargs)
+    def options(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send an OPTIONS request.
 
-    def put(self, url: str, data: Any = None, json: Any = None, **kwargs: Any) -> Response:
-        return self.execute_request("PUT", url, data=data, json=json, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "OPTIONS",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
-    def patch(self, url: str, data: Any = None, json: Any = None, **kwargs: Any) -> Response:
-        return self.execute_request("PATCH", url, data=data, json=json, **kwargs)
+    def head(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = False,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a HEAD request (redirects are not followed by default).
 
-    def delete(self, url: str, **kwargs: Any) -> Response:
-        return self.execute_request("DELETE", url, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "HEAD",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
+    def post(
+        self,
+        url: str,
+        data: Any = None,
+        json: Any = None,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a POST request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "POST",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    def put(
+        self,
+        url: str,
+        data: Any = None,
+        json: Any = None,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a PUT request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "PUT",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    def patch(
+        self,
+        url: str,
+        data: Any = None,
+        json: Any = None,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a PATCH request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "PATCH",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    def delete(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:
+        """Send a DELETE request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return self.execute_request(
+            "DELETE",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )

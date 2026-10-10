@@ -9,10 +9,11 @@ from __future__ import annotations
 import asyncio
 import functools
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional
+from typing import Any, Mapping, Optional, Sequence
 
 from .response import Response
-from .session import Session
+from .cookiejar import CookieInput
+from .session import _UNSET, ProxyInput, Session
 
 
 class AsyncSession(Session):
@@ -47,27 +48,307 @@ class AsyncSession(Session):
         call = functools.partial(Session.execute_request, self, method, url, **kwargs)
         return await loop.run_in_executor(self._pool(), call)
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request(method, url, **kwargs)
+    async def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a request with an arbitrary method.
 
-    async def get(self, url: str, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request("GET", url, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            method,
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
-    async def options(self, url: str, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request("OPTIONS", url, **kwargs)
+    async def get(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a GET request.
 
-    async def head(self, url: str, **kwargs: Any) -> Response:  # type: ignore[override]
-        kwargs.setdefault("allow_redirects", False)
-        return await self.execute_request("HEAD", url, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "GET",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
-    async def post(self, url: str, data: Any = None, json: Any = None, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request("POST", url, data=data, json=json, **kwargs)
+    async def options(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send an OPTIONS request.
 
-    async def put(self, url: str, data: Any = None, json: Any = None, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request("PUT", url, data=data, json=json, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "OPTIONS",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
 
-    async def patch(self, url: str, data: Any = None, json: Any = None, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request("PATCH", url, data=data, json=json, **kwargs)
+    async def head(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = False,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a HEAD request (redirects are not followed by default).
 
-    async def delete(self, url: str, **kwargs: Any) -> Response:  # type: ignore[override]
-        return await self.execute_request("DELETE", url, **kwargs)
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "HEAD",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    async def post(
+        self,
+        url: str,
+        data: Any = None,
+        json: Any = None,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a POST request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "POST",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    async def put(
+        self,
+        url: str,
+        data: Any = None,
+        json: Any = None,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a PUT request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "PUT",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    async def patch(
+        self,
+        url: str,
+        data: Any = None,
+        json: Any = None,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a PATCH request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "PATCH",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )
+
+    async def delete(
+        self,
+        url: str,
+        *,
+        data: Any = None,
+        json: Any = None,
+        params: Optional[Mapping[str, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        cookies: CookieInput = None,
+        allow_redirects: bool = True,
+        verify: Optional[bool] = None,
+        timeout: Optional[float] = _UNSET,
+        proxy: ProxyInput = None,
+        proxies: ProxyInput = None,
+        header_order: Optional[Sequence[str]] = None,
+        host_override: Optional[str] = None,
+    ) -> Response:  # type: ignore[override]
+        """Send a DELETE request.
+
+        See ``Session.execute_request`` for what every parameter does.
+        """
+        return await self.execute_request(
+            "DELETE",
+            url,
+            data=data,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            allow_redirects=allow_redirects,
+            verify=verify,
+            timeout=timeout,
+            proxy=proxy,
+            proxies=proxies,
+            header_order=header_order,
+            host_override=host_override,
+        )

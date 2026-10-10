@@ -17,7 +17,7 @@ r.json()["tls"]["ja4"]                         # t13d1517h2_8daaf6152771_cb7bf58
 ```bash
 pip install skeltahtls                                                # PyPI
 pip install git+https://github.com/skeltah/skeltahtls.git             # прямо из репозитория (нужен git)
-pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.4   # конкретная версия
+pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.5   # конкретная версия
 pip install -e .                                                      # dev-режим из клона
 ```
 
@@ -40,6 +40,7 @@ Wheel один на все платформы (~40 МБ, бинарники вн
 | `certCompressionAlgo`, `withDefaultCookieJar`, `additionalDecode` — устаревшие ключи API | Актуальные ключи v1.16: `certCompressionAlgos`, `withCustomCookieJar`, `timeoutMilliseconds`, `disableHttp3`, `disableSessionTickets`, `requestHostOverride`, `trustAnchorsPayload`, ... |
 | `pseudo_header_order` с профилем — тихо игнорировался | Профили содержат свой порядок (Chrome: `m,a,s,p`); несовпадающий → ошибка сразу |
 | Зависимость от `requests` (только ради `HTTPError`) | Без зависимостей |
+| `get/post/...(url, **kwargs)` — IDE не показывает ни одного параметра, опечатка в имени видна только в рантайме | Параметры расписаны явно на каждом методе (`params`, `headers`, `cookies`, `timeout`, `proxy`, `header_order`, `host_override`, ...), с докстрокой |
 | `client_identifier: str`, пакет без `py.typed` → ни автодополнения, ни проверки; опечатка = молчаливый откат на дефолтный профиль Go | `Literal` из 83 профилей + `py.typed` + `Profiles.<Tab>` + `find()`; опечатка → ошибка с ближайшими вариантами |
 | Невалидные комбинации опций (racing + force_http1, racing с http-прокси, ipv4+ipv6 off, pinning + verify=False) доходили до Go, который сохранял `nil`-клиент, и `close()` **ронял процесс** Go-паникой | Проверяются в Python до запроса → `SessionConfigurationError`; плюс сломанная Go-сессия больше никогда не передаётся в `destroySession` |
 | Версия транспорта — три разрозненных булевых флага | `http_version="auto"/"1.1"/"2"/"3"`, меняется между запросами; `r.http_version` показывает фактическую |
@@ -58,6 +59,8 @@ s = Session(
 s.headers.update({...})
 s.cookies.set("name", "value", domain="example.com")
 
+# у get/post/put/patch/delete/head/options/request параметры расписаны явно -
+# IDE показывает их при вводе, опечатка (order= вместо header_order=) подсвечивается сразу
 r = s.post(url, json={...}, headers={...}, header_order=[...], proxy=..., allow_redirects=True)
 r.status_code, r.text, r.json(), r.headers, r.cookies, r.history, r.elapsed
 r.http_version   # "1.1" | "2" | "3" - по чему реально прошёл запрос (r.used_protocol - сырая строка)
