@@ -15,6 +15,7 @@ from . import _cffi
 from .cookiejar import CookieInput, CookieJar
 from .cookies import MockRequest, extract_cookies_to_jar
 from .exceptions import SessionConfigurationError, TLSClientException
+from .multipart import FilesInput, boundary_from_content_type, encode_multipart
 from . import profiles as _profiles
 from .profiles import (
     DEFAULT_PROFILE,
@@ -410,7 +411,33 @@ class Session:
         return f"{url}&{query}" if "?" in url else f"{url}?{query}"
 
     @staticmethod
-    def _prepare_body(data: Any, json: Any) -> Tuple[Optional[Union[str, bytes]], Optional[str]]:
+    def _prepare_body(
+        data: Any,
+        json: Any,
+        files: FilesInput = None,
+        existing_content_type: Optional[str] = None,
+    ) -> Tuple[Optional[Union[str, bytes]], Optional[str]]:
+        """Request body and the content type that goes with it.
+
+        With ``files`` the body is multipart/form-data shaped like Chrome's (see
+        skeltahtls.multipart): fields from ``data`` first, in their own order, then the
+        files. A boundary already present in ``existing_content_type`` is reused, so a
+        caller who set the header themselves does not end up with a body that contradicts
+        it.
+        """
+        if files:
+            if json is not None:
+                raise TypeError(
+                    "files= and json= cannot be sent together: a multipart body carries the "
+                    "JSON as one of its parts, e.g. "
+                    'files={"payload": (None, json.dumps(obj)), "file": ("x.pdf", data)}'
+                )
+            if data is not None and isinstance(data, (str, bytes, bytearray)):
+                raise TypeError(
+                    "data= must be a mapping (or a list of pairs) when files= is given; a raw "
+                    "string or bytes body cannot be merged into a multipart body"
+                )
+            return encode_multipart(files, data, boundary_from_content_type(existing_content_type))
         if data is None and json is not None:
             return _json.dumps(json, separators=(",", ":"), ensure_ascii=False), "application/json"
         if data is not None and not isinstance(data, (str, bytes, bytearray)):
@@ -597,11 +624,16 @@ class Session:
         proxies: Any = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        files: FilesInput = None,
     ) -> Response:
         """Send a request. The verb methods (``get``, ``post``, ...) call this.
 
         params           appended to the query string
         data / json      request body; ``json`` also sets a JSON content-type
+        files            multipart/form-data body written the way Chrome writes it:
+                         {"field": (filename, content, content_type)}, or a list of pairs
+                         to fix the order of the parts. ``data`` fields are sent first, in
+                         their own order. Cannot be combined with ``json``
         headers          merged over ``self.headers``; a None value drops that header
         cookies          added to ``self.cookies`` for this request only (see CookieJar)
         allow_redirects  follow redirects, keeping cookies and history (default True)
@@ -617,8 +649,8 @@ class Session:
         method = method.upper()
         merged_params = {**self.params, **(params or {})} if (self.params or params) else None
         url = self._prepare_url(url, merged_params)
-        body, content_type = self._prepare_body(data, json)
         request_headers = self._merge_headers(headers)
+        body, content_type = self._prepare_body(data, json, files, request_headers.get("content-type"))
         if content_type is not None and "content-type" not in request_headers:
             request_headers["content-type"] = content_type
 
@@ -707,6 +739,7 @@ class Session:
         *,
         data: Any = None,
         json: Any = None,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -727,6 +760,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -745,6 +779,7 @@ class Session:
         *,
         data: Any = None,
         json: Any = None,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -765,6 +800,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -783,6 +819,7 @@ class Session:
         *,
         data: Any = None,
         json: Any = None,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -803,6 +840,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -821,6 +859,7 @@ class Session:
         *,
         data: Any = None,
         json: Any = None,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -841,6 +880,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -859,6 +899,7 @@ class Session:
         data: Any = None,
         json: Any = None,
         *,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -879,6 +920,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -897,6 +939,7 @@ class Session:
         data: Any = None,
         json: Any = None,
         *,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -917,6 +960,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -935,6 +979,7 @@ class Session:
         data: Any = None,
         json: Any = None,
         *,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -955,6 +1000,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
@@ -973,6 +1019,7 @@ class Session:
         *,
         data: Any = None,
         json: Any = None,
+        files: FilesInput = None,
         params: Optional[Mapping[str, Any]] = None,
         headers: Optional[Mapping[str, str]] = None,
         cookies: CookieInput = None,
@@ -993,6 +1040,7 @@ class Session:
             url,
             data=data,
             json=json,
+            files=files,
             params=params,
             headers=headers,
             cookies=cookies,
