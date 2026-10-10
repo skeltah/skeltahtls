@@ -86,6 +86,25 @@ class Response:
         return "location" in self.headers and self.status_code in (301, 308)
 
     @property
+    def http_version(self) -> Optional[str]:
+        """Protocol this response actually came over: "1.1", "2", "3" (None if unknown).
+
+        ``used_protocol`` holds the raw string the library reported ("HTTP/2.0", "h2", ...).
+        """
+        raw = (self.used_protocol or "").lower()
+        if not raw:
+            return None
+        if "3" in raw:
+            return "3"
+        if "2" in raw:
+            return "2"
+        if "1.1" in raw or raw in ("h1", "http/1.1"):
+            return "1.1"
+        if "1.0" in raw:
+            return "1.0"
+        return None
+
+    @property
     def apparent_encoding(self) -> str:
         if _chardet is None or not self._content:
             return "utf-8"

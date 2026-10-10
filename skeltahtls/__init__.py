@@ -20,10 +20,10 @@ from .profiles import (
     ClientIdentifiers,
 )
 from .response import Response
-from .session import Session
+from .session import HTTP_VERSIONS, Session, normalize_http_version
 
 __all__ = [
-    "Session", "AsyncSession", "Response", "CookieJar",
+    "Session", "AsyncSession", "Response", "CookieJar", "HTTP_VERSIONS", "normalize_http_version",
     "TLSClientException", "TLSClientExeption", "HTTPError", "SessionConfigurationError",
     "ClientIdentifiers", "ALL_IDENTIFIERS", "CHROME_LATEST", "CHROME_LATEST_PSK", "FIREFOX_LATEST", "DEFAULT_PROFILE",
     "destroy_all", "library_version", "library_features", "__version__",

@@ -95,7 +95,8 @@ def test_async_session_concurrent():
 
 
 def test_redirects_are_followed_with_history():
+    # httpbin.org is not usable for this: it currently serves a certificate for another domain
     with Session() as s:
-        r = s.get("https://httpbin.org/redirect/2", headers={"user-agent": HEADERS["user-agent"]})
+        r = s.get("https://httpbingo.org/redirect/2", headers={"user-agent": HEADERS["user-agent"]})
     assert r.status_code == 200 and len(r.history) == 2
     assert r.url.endswith("/get")

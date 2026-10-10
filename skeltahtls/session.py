@@ -6,6 +6,7 @@ import json as _json
 import time
 import urllib.parse
 import uuid
+import warnings
 from datetime import timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 from urllib.parse import urljoin
@@ -20,6 +21,38 @@ from .response import Response, build_response
 from .structures import CaseInsensitiveDict
 
 _UNSET: Any = object()
+
+# http_version -> (force_http1, disable_http3, with_protocol_racing)
+HTTP_VERSIONS: Dict[str, Tuple[bool, bool, bool]] = {
+    # ALPN as the profile defines it: h2, falling back to http/1.1. Never QUIC.
+    "auto": (False, False, False),
+    # ALPN forced to ["http/1.1"]. This changes the ClientHello: JA4 becomes ...h1_...
+    "1.1": (True, False, False),
+    # Like auto, plus h3 stripped from ALPN/ALPS for the profiles that advertise it
+    # (profiles.PROFILES_WITH_H3_ALPN); identical to auto for every other profile.
+    "2": (False, True, False),
+    # Chrome-style protocol racing: QUIC immediately, HTTP/2 after 300 ms, winner cached per
+    # host. Needs a SOCKS5 proxy if a proxy is used at all - only SOCKS5 can tunnel UDP.
+    "3": (False, False, True),
+}
+_HTTP_VERSION_ALIASES: Dict[Any, str] = {
+    None: "auto", "auto": "auto", "negotiate": "auto",
+    1: "1.1", 1.1: "1.1", "1": "1.1", "1.1": "1.1", "h1": "1.1", "http1": "1.1", "http/1.1": "1.1",
+    2: "2", "2": "2", "h2": "2", "http2": "2", "http/2": "2",
+    3: "3", "3": "3", "h3": "3", "http3": "3", "http/3": "3", "quic": "3",
+}
+
+
+def normalize_http_version(value: Any) -> str:
+    """Map 1 / "1.1" / "h2" / 3 / "quic" / None onto a key of HTTP_VERSIONS."""
+    try:
+        return _HTTP_VERSION_ALIASES[value]
+    except (KeyError, TypeError):
+        raise SessionConfigurationError(
+            "unknown http_version {!r}; use one of {} (aliases: 1, 2, 3, 'h2', 'h3', 'quic', None)".format(
+                value, ", ".join(repr(v) for v in HTTP_VERSIONS)
+            )
+        ) from None
 
 CUSTOM_TLS_FIELDS = (
     "ja3_string", "h2_settings", "h2_settings_order", "supported_signature_algorithms",
@@ -78,6 +111,7 @@ class Session:
         # --- request shaping -------------------------------------------------------------------------
         header_order: Optional[Sequence[str]] = None,
         random_tls_extension_order: bool = True,
+        http_version: Any = _UNSET,
         force_http1: bool = False,
         disable_http3: bool = False,
         disable_session_tickets: bool = False,
@@ -145,6 +179,7 @@ class Session:
 
         self._session_id = str(uuid.uuid4())
         self._go_client_config: Optional[str] = None  # config the live Go client was created with
+        self._go_client_broken = False  # the library stored a nil client under this id
 
         # requests-compatible public state
         self.headers: CaseInsensitiveDict = CaseInsensitiveDict()
@@ -194,6 +229,15 @@ class Session:
         self.catch_panics = catch_panics
         self.debug = debug
 
+        if http_version is not _UNSET:
+            if force_http1 or disable_http3 or with_protocol_racing:
+                raise SessionConfigurationError(
+                    "http_version cannot be combined with force_http1 / disable_http3 / "
+                    "with_protocol_racing - they are the same setting at a lower level"
+                )
+            self.http_version = http_version
+        self._validate_transport()
+
     # ------------------------------------------------------------------ lifecycle
 
     def __enter__(self) -> "Session":
@@ -213,6 +257,10 @@ class Session:
         if self._go_client_config is None:
             return
         self._go_client_config = None
+        if self._go_client_broken:
+            # destroying a session whose client failed to build panics inside Go and takes the
+            # process down; abandon the id instead (one unused map entry inside the library)
+            return
         _cffi.call("destroySession", {"sessionId": self._session_id})
 
     def reset_connection(self) -> None:
@@ -222,6 +270,78 @@ class Session:
     @property
     def session_id(self) -> str:
         return self._session_id
+
+    # ------------------------------------------------------------------ transport protocol
+
+    @property
+    def http_version(self) -> str:
+        """Transport protocol: "auto" (default), "1.1", "2" or "3" - see HTTP_VERSIONS.
+
+        Assignable between requests (``s.http_version = 3``); the next request opens a new
+        connection with the new setting. Accepts 1 / 2 / 3, "h2", "h3", "quic", None.
+        """
+        if self.with_protocol_racing:
+            return "3"
+        if self.force_http1:
+            return "1.1"
+        if self.disable_http3:
+            return "2"
+        return "auto"
+
+    @http_version.setter
+    def http_version(self, value: Any) -> None:
+        version = normalize_http_version(value)
+        self.force_http1, self.disable_http3, self.with_protocol_racing = HTTP_VERSIONS[version]
+        self._warn_about_http_version(version)
+        self._validate_transport()
+
+    def _warn_about_http_version(self, version: str) -> None:
+        identifier = self.client_identifier
+        if identifier is None:
+            return
+        if version == "2" and identifier in _profiles.PROFILES_WITH_H3_ALPN:
+            warnings.warn(
+                "http_version=2 removes h3 from the ALPN/ALPS of {}, which changes its ClientHello "
+                "(JA3/JA4). Use http_version='auto' to keep the profile byte-exact.".format(identifier),
+                stacklevel=3,
+            )
+        if version == "3" and identifier not in _profiles.PROFILES_WITH_HTTP3_SETTINGS:
+            warnings.warn(
+                "{} carries no HTTP/3 settings, so an h3 connection uses the library's default QUIC/h3 "
+                "parameters instead of browser-accurate ones. Profiles with h3 settings: {}.".format(
+                    identifier, ", ".join(sorted(_profiles.PROFILES_WITH_HTTP3_SETTINGS))
+                ),
+                stacklevel=3,
+            )
+
+    def _validate_transport(self, proxy: str = "") -> None:
+        """Reject option combinations the Go library refuses.
+
+        Not a nicety: a rejected config makes the shared library store a nil client under this
+        session id, and destroying that session afterwards panics inside Go, which takes the
+        whole process down. Catching it here keeps that from happening.
+        """
+        if self.with_protocol_racing and self.force_http1:
+            raise SessionConfigurationError(
+                "http_version=3 (protocol racing) cannot be combined with force_http1"
+            )
+        if self.with_protocol_racing and self.disable_http3:
+            raise SessionConfigurationError(
+                "http_version=3 (protocol racing) cannot be combined with disable_http3"
+            )
+        if self.disable_ipv4 and self.disable_ipv6:
+            raise SessionConfigurationError("cannot disable both IPv4 and IPv6")
+        if self.certificate_pinning and not self.verify:
+            raise SessionConfigurationError("certificate_pinning cannot be used with verify=False")
+        proxy = proxy or self._resolve_proxy(None)
+        if self.with_protocol_racing and proxy:
+            scheme = proxy.split("://", 1)[0].lower() if "://" in proxy else ""
+            if scheme not in ("socks5", "socks5h"):
+                raise SessionConfigurationError(
+                    "http_version=3 (protocol racing) needs a SOCKS5 proxy: {} cannot tunnel "
+                    "QUIC/UDP, so HTTP/3 would bypass the proxy and leak the real IP. Use socks5:// "
+                    "or http_version='auto'.".format(scheme or "this proxy")
+                )
 
     # ------------------------------------------------------------------ cookie helpers
 
@@ -443,6 +563,7 @@ class Session:
         verify = self.verify if verify is None else verify
         timeout = self.timeout if timeout is _UNSET else timeout
         proxy_url = self._resolve_proxy(proxy if proxy is not None else proxies)
+        self._validate_transport(proxy_url)
 
         history: List[Response] = []
         start = time.perf_counter()
@@ -460,7 +581,11 @@ class Session:
 
             result = _cffi.call("request", payload)
             if result.get("status") == 0:
-                raise TLSClientException(result.get("body", "unknown tls-client error"))
+                message = result.get("body", "unknown tls-client error")
+                if "failed to build client" in message or "invalid config" in message:
+                    self._go_client_broken = True
+                    self._renew_session_id()
+                raise TLSClientException(message)
 
             jar = extract_cookies_to_jar(
                 request_url=url,
@@ -489,6 +614,12 @@ class Session:
                 for h in ("content-length", "content-type", "transfer-encoding"):
                     request_headers.pop(h, None)
 
+    def _renew_session_id(self) -> None:
+        """Leave a broken Go-side session behind and continue under a fresh id."""
+        self._session_id = str(uuid.uuid4())
+        self._go_client_config = None
+        self._go_client_broken = False
+
     def _ensure_go_client(self, timeout: Optional[float], verify: bool) -> None:
         """Rebuild the Go client when a transport-level option changed since it was created.
 
@@ -499,7 +630,10 @@ class Session:
         if self._go_client_config is None:
             self._go_client_config = config
         elif config != self._go_client_config:
-            _cffi.call("destroySession", {"sessionId": self._session_id})
+            if self._go_client_broken:
+                self._renew_session_id()
+            else:
+                _cffi.call("destroySession", {"sessionId": self._session_id})
             self._go_client_config = config
 
     # ------------------------------------------------------------------ verbs

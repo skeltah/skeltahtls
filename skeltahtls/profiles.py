@@ -1,9 +1,9 @@
 """Client profiles built into the bundled tls-client library (v1.16.0).
 
-Generated from bogdanfinn/tls-client profiles/profiles.go - do not hand-edit the list,
-re-run scripts/gen_profiles.py after updating binaries.
+Generated from bogdanfinn/tls-client by scripts/gen_profiles.py - do not hand-edit
+anything above the marker line.
 """
-from typing import Literal, Tuple
+from typing import FrozenSet, Literal, Tuple
 
 ClientIdentifiers = Literal[
     # chrome
@@ -109,6 +109,24 @@ CHROME_LATEST = "chrome_152"
 CHROME_LATEST_PSK = "chrome_152_PSK"
 FIREFOX_LATEST = "firefox_148"
 DEFAULT_PROFILE = CHROME_LATEST
+
+# Profiles whose ClientHello advertises h3 in ALPN/ALPS. disable_http3 (http_version=2)
+# strips it and therefore changes their fingerprint.
+PROFILES_WITH_H3_ALPN: FrozenSet[str] = frozenset({
+    "chrome_133",
+    "chrome_133_PSK",
+})
+
+# Profiles carrying browser HTTP/3 SETTINGS, pseudo-header order and GREASE frames.
+# With any other profile an h3 connection (http_version=3) is not browser-accurate:
+# the QUIC/h3 layer falls back to the library defaults.
+PROFILES_WITH_HTTP3_SETTINGS: FrozenSet[str] = frozenset({
+    "chrome_144",
+    "chrome_144_PSK",
+    "firefox_147",
+    "firefox_147_PSK",
+    "firefox_148",
+})
 
 # pseudo header order hard-wired into every built-in Chrome/Brave/Opera profile
 CHROME_PSEUDO_HEADER_ORDER = (":method", ":authority", ":scheme", ":path")

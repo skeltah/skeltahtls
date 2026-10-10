@@ -17,7 +17,7 @@ r.json()["tls"]["ja4"]                         # t13d1517h2_8daaf6152771_cb7bf58
 ```bash
 pip install skeltahtls                                                # PyPI
 pip install git+https://github.com/skeltah/skeltahtls.git             # прямо из репозитория (нужен git)
-pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.2   # конкретная версия
+pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.3   # конкретная версия
 pip install -e .                                                      # dev-режим из клона
 ```
 
@@ -40,6 +40,8 @@ Wheel один на все платформы (~40 МБ, бинарники вн
 | `certCompressionAlgo`, `withDefaultCookieJar`, `additionalDecode` — устаревшие ключи API | Актуальные ключи v1.16: `certCompressionAlgos`, `withCustomCookieJar`, `timeoutMilliseconds`, `disableHttp3`, `disableSessionTickets`, `requestHostOverride`, `trustAnchorsPayload`, ... |
 | `pseudo_header_order` с профилем — тихо игнорировался | Профили содержат свой порядок (Chrome: `m,a,s,p`); несовпадающий → ошибка сразу |
 | Зависимость от `requests` (только ради `HTTPError`) | Без зависимостей |
+| Невалидные комбинации опций (racing + force_http1, racing с http-прокси, ipv4+ipv6 off, pinning + verify=False) доходили до Go, который сохранял `nil`-клиент, и `close()` **ронял процесс** Go-паникой | Проверяются в Python до запроса → `SessionConfigurationError`; плюс сломанная Go-сессия больше никогда не передаётся в `destroySession` |
+| Версия транспорта — три разрозненных булевых флага | `http_version="auto"/"1.1"/"2"/"3"`, меняется между запросами; `r.http_version` показывает фактическую |
 
 ## Использование
 
@@ -47,6 +49,7 @@ Wheel один на все платформы (~40 МБ, бинарники вн
 s = Session(
     client_identifier="chrome_152",     # по умолчанию; skeltahtls.CHROME_LATEST
     random_tls_extension_order=True,    # по умолчанию; Chrome перемешивает расширения на каждом соединении
+    http_version="auto",                # "auto" | "1.1" | "2" | "3" (см. ниже)
     proxy="socks5://user:pass@host:port",
     timeout=20,                          # float → timeoutMilliseconds
     header_order=[...],                  # опционально; иначе порядок dict
@@ -55,13 +58,46 @@ s.headers.update({...})
 s.cookies.set("name", "value", domain="example.com")
 
 r = s.post(url, json={...}, headers={...}, header_order=[...], proxy=..., allow_redirects=True)
-r.status_code, r.text, r.json(), r.headers, r.cookies, r.history, r.used_protocol, r.elapsed
+r.status_code, r.text, r.json(), r.headers, r.cookies, r.history, r.elapsed
+r.http_version   # "1.1" | "2" | "3" - по чему реально прошёл запрос (r.used_protocol - сырая строка)
 ```
 
 Transport-опции (`force_http1`, `client_identifier`, `random_tls_extension_order`, `timeout`, `verify`,
 `disable_http3`, `disable_session_tickets`, `server_name_overwrite`, `local_address`, ...) можно менять
 между запросами как атрибуты — следующий запрос откроет новое соединение с новыми параметрами.
 `s.reset_connection()` принудительно делает новый TLS-handshake.
+
+### Версия транспорта
+
+```python
+s = Session(http_version="auto")   # по умолчанию
+s.http_version = 3                 # можно менять между запросами
+r = s.get(url); r.http_version     # по чему реально прошло
+```
+
+Принимает `1`/`"1.1"`/`"h1"`, `2`/`"h2"`, `3`/`"h3"`/`"quic"`, `None`/`"auto"`.
+
+| Значение | Что делает | Отпечаток |
+|---|---|---|
+| `"auto"` (по умолчанию) | ALPN как в профиле: `h2`, с откатом на `http/1.1`. QUIC не используется | профиль байт-в-байт |
+| `"1.1"` | ALPN принудительно `["http/1.1"]` | **JA4 меняется**: `t13d1517h2_…` → `t13d1517h1_…` |
+| `"2"` | как `auto` + `h3` вырезается из ALPN/ALPS | для `chrome_152` без изменений; меняет ClientHello только у профилей из `profiles.PROFILES_WITH_H3_ALPN` (сейчас `chrome_133*`) — тогда выдаётся warning |
+| `"3"` | Chrome-style protocol racing: QUIC сразу, HTTP/2 через 300 мс, победитель кэшируется по хосту | TLS как в профиле; QUIC/h3-слой — см. ниже |
+
+Про `"3"`:
+
+- Это **не** «только h3»: Go-библиотека умеет HTTP/3 исключительно через гонку, поэтому на хосте без
+  QUIC (например `tls.peet.ws`) через 300 мс выигрывает h2 — `r.http_version` покажет `"2"`. На
+  `cloudflare-quic.com` / `www.google.com` выигрывает `"3"`.
+- С прокси нужен **socks5** — только он туннелирует UDP; иначе `SessionConfigurationError` (с
+  http-прокси QUIC ушёл бы мимо прокси и засветил реальный IP).
+- Chrome-точный h3-отпечаток (SETTINGS, порядок псевдо-заголовков, GREASE-фреймы) есть только у
+  профилей из `profiles.PROFILES_WITH_HTTP3_SETTINGS` — сейчас `chrome_144*`, `firefox_147*`,
+  `firefox_148`. У `chrome_152` их нет, поэтому `http_version=3` с ним выдаёт warning: TLS будет
+  как у Chrome 152, а QUIC/h3-параметры — дефолтные для библиотеки.
+
+Низкоуровневые флаги `force_http1` / `disable_http3` / `with_protocol_racing` остались и работают
+как раньше; `http_version` — это они же одним параметром (смешивать в одном вызове нельзя).
 
 ### Кастомный отпечаток
 
@@ -142,6 +178,8 @@ tls-client, поэтому релизные бинарники отстают о
 - Заголовок `cookie` в HTTP/2 fhttp разбивает на отдельные поля на каждую куку (`cookie: a=1`, `cookie: b=2`),
   Chrome шлёт одно поле. Правится только в Go (fhttp `h2_bundle.go`); на серверной стороне после HPACK
   обычно неразличимо.
+- HTTP/3 доступен только через racing (`http_version=3`), «только h3» библиотека не поддерживает;
+  h3-отпечаток браузерный лишь у профилей из `PROFILES_WITH_HTTP3_SETTINGS`.
 - `pseudo_header_order` со встроенным профилем изменить нельзя — только через `client_identifier=None` + `ja3_string`.
 - `stream=True` из оригинальной обёртки убран (там был поток с временным файлом в cwd); тело всегда в памяти.
 - macOS-бинарники — релизные апстримные (см. выше), собрать свои: `MACOS_SDK=... python scripts/build_binaries.py`.
