@@ -71,8 +71,19 @@ def _manifest() -> Dict[str, Any]:
 
 
 def library_version() -> str:
-    """Version of the bundled Go library, from dependencies/manifest.json."""
-    return _manifest().get("version", "unknown")
+    """Version of the tls-client library in use, from dependencies/manifest.json.
+
+    Per-file, because the bundled libraries can come from different upstream versions
+    (a platform whose binary has to come from a release lags the ones built from source).
+    """
+    import os
+    from ._platform import ENV_OVERRIDE, shared_library_path
+    manifest = _manifest()
+    if not os.environ.get(ENV_OVERRIDE):
+        entry = manifest.get("files", {}).get(shared_library_path().name, {})
+        if entry.get("version"):
+            return str(entry["version"])
+    return manifest.get("version", "unknown")
 
 
 def library_features() -> Dict[str, bool]:

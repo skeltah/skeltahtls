@@ -94,6 +94,7 @@ def main() -> int:
                 return 1
             tmp_path.replace(DEP_DIR / shipped)
             files[shipped] = {
+                "version": version,
                 "source": f"{RELEASE_URL.format(version=version, asset=asset)}",
                 "sha256": digest,
                 "size": size,

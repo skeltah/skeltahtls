@@ -2,7 +2,10 @@
 
 requests-подобный HTTP-клиент с точным TLS/HTTP2-отпечатком браузера. Форк `tls_client` / `tls_client2`
 поверх Go-библиотеки [bogdanfinn/tls-client](https://github.com/bogdanfinn/tls-client), с бинарниками,
-собранными из исходников актуального тега (сейчас **v1.16.0**, профиль по умолчанию **`chrome_152`**).
+собранными из исходников актуального тега (сейчас **v1.17.1**, профиль по умолчанию **`chrome_152`**).
+
+Профиль `chrome_152` сверен с живым **Chrome 156**: `ja4`, `ja4_r`, `ja3n` и akamai-отпечаток
+совпадают полностью — Chrome 153–156 не меняли ClientHello, поэтому новее профиля и не существует.
 
 ```python
 from skeltahtls import Session, AsyncSession
@@ -17,7 +20,7 @@ r.json()["tls"]["ja4"]                         # t13d1517h2_8daaf6152771_cb7bf58
 ```bash
 pip install skeltahtls                                                # PyPI
 pip install git+https://github.com/skeltah/skeltahtls.git             # прямо из репозитория (нужен git)
-pip install git+https://github.com/skeltah/skeltahtls.git@v1.16.0.6   # конкретная версия
+pip install git+https://github.com/skeltah/skeltahtls.git@v1.17.1.1   # конкретная версия
 pip install -e .                                                      # dev-режим из клона
 ```
 
@@ -191,12 +194,21 @@ async with AsyncSession() as s:
 AsyncSession.configure_executor(128)   # размер общего пула потоков (по умолчанию 64)
 ```
 
+## Версии бинарников
+
+`dependencies/manifest.json` хранит для каждого файла источник, sha256 и версию, из которой он
+собран; `skeltahtls.library_version()` возвращает версию именно того файла, который загружен на
+этой платформе. Сейчас Windows и Linux собраны из **v1.17.1**, macOS-дилибы взяты из релиза
+**v1.16.0** (у v1.17.x нет GitHub-релиза, а собрать их локально без Apple SDK нельзя) — чтобы
+подтянуть и macOS, достаточно запустить workflow *Build binaries* с ref `v1.17.1`: на
+macos-runner они соберутся нативно.
+
 ## Обновление под новый Chrome
 
 ```bash
-python scripts/build_binaries.py v1.17.0      # Go + zig; собирает из исходников тега для всех целей кроме macOS
-python scripts/update_binaries.py 1.17.0 darwin   # macOS — из GitHub Releases (или build с MACOS_SDK=...)
-python scripts/gen_profiles.py v1.17.0        # перегенерировать список идентификаторов, *_LATEST
+python scripts/build_binaries.py v1.17.1      # Go + zig; из исходников тега/ветки, все цели кроме macOS
+python scripts/update_binaries.py 1.16.0 darwin   # macOS — из GitHub Releases (или build с MACOS_SDK=...)
+python scripts/gen_profiles.py v1.17.1        # перегенерировать список идентификаторов, *_LATEST
 pytest                                        # tests/test_fingerprint.py сверяет JA4/akamai с эталоном Chrome
 ```
 
@@ -206,7 +218,9 @@ pytest                                        # tests/test_fingerprint.py све
 
 Почему сборка из исходников: `cffi_dist/go.mod` в апстриме зафиксирован на *предыдущую* версию
 tls-client, поэтому релизные бинарники отстают от тега (в DLL 1.16.0 нет имён `GREASE`/`MLDSA*`
-для signature_algorithms → кастомный JA3 Chrome 150+ падает с «unknown ClientHelloID»).
+для signature_algorithms → кастомный JA3 Chrome 150+ падает с «unknown ClientHelloID»). Вдобавок
+теги и релизы у апстрима разъехались: v1.17.0 и v1.17.1 существуют только как теги, GitHub
+Releases (и `update_binaries.py`) заканчиваются на v1.16.0.
 `dependencies/manifest.json` хранит для каждого файла источник, sha256 и флаги `features`;
 обёртка сама убирает неподдерживаемые имена, если работает на апстримном бинарнике (сейчас — macOS).
 

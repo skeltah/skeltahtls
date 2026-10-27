@@ -3,7 +3,10 @@ MIT License
 Copyright (c) 2026 skeltah
 
 Derived from Python-Tls-Client (c) Florian Zager and tls-client (c) Torsten Klement, both MIT
-(see LICENSE.tls_client). Bundles shared libraries built from github.com/bogdanfinn/tls-client (BSD-4-Clause).
+(see LICENSE.tls_client). Bundles shared libraries built from github.com/bogdanfinn/tls-client:
+the libraries built from v1.17.1 are BSD-3-Clause, the macOS dylibs taken from the v1.16.0
+release predate that relicensing and are BSD-4-Clause. skeltahtls/dependencies/manifest.json
+records which version each bundled file came from.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

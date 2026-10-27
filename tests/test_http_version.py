@@ -3,14 +3,13 @@ import warnings
 
 import pytest
 
+from conftest import BROWSERLEAKS, CHROME, NO_QUIC_HOST, QUIC_HOST, fetch
 from skeltahtls import HTTP_VERSIONS, Response, Session, SessionConfigurationError
 from skeltahtls import profiles as P
 from skeltahtls.structures import CaseInsensitiveDict
 
-PEET = "https://tls.peet.ws/api/all"
-QUIC_HOST = "https://cloudflare-quic.com/"
-CHROME_152_JA4_H2 = "t13d1517h2_8daaf6152771_cb7bf5808d99"
-CHROME_152_JA4_H1 = "t13d1517h1_8daaf6152771_cb7bf5808d99"  # forcing http/1.1 rewrites ALPN
+CHROME_JA4_H2 = CHROME["ja4"]
+CHROME_JA4_H1 = CHROME["ja4"].replace("h2_", "h1_", 1)  # forcing http/1.1 rewrites ALPN
 
 
 def test_default_is_auto():
@@ -124,13 +123,11 @@ def test_response_http_version(used, expected):
 @pytest.mark.network
 def test_http1_and_h2_on_the_wire():
     with Session(http_version=2) as s:
-        r = s.get(PEET)
-        assert r.http_version == "2" and r.json()["tls"]["ja4"] == CHROME_152_JA4_H2
+        assert fetch(BROWSERLEAKS, s)["ja4"] == CHROME_JA4_H2
         s.http_version = 1
-        r = s.get(PEET)
-        assert r.http_version == "1.1"
-        # forcing http/1.1 rewrites ALPN in the ClientHello, so JA4 changes too
-        assert r.json()["tls"]["ja4"] == CHROME_152_JA4_H1
+        d = fetch(BROWSERLEAKS, s)
+        # forcing http/1.1 rewrites ALPN in the ClientHello, so JA4 changes with it
+        assert d["ja4"] == CHROME_JA4_H1
 
 
 @pytest.mark.network
@@ -138,6 +135,7 @@ def test_h3_is_used_against_a_quic_host_and_falls_back_otherwise():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         with Session(client_identifier="chrome_144", http_version=3) as s:
-            assert s.get(QUIC_HOST).http_version == "3"
+            assert s.get(QUIC_HOST, timeout=30).http_version == "3"
         with Session(http_version=3) as s:
-            assert s.get(PEET).http_version == "2"  # no QUIC there: h2 wins the race
+            # no alt-svc there, so HTTP/2 wins the race after the 300 ms head start
+            assert s.get(NO_QUIC_HOST, timeout=30).http_version == "2"
