@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import base64
 import json as _json
+import threading
 import time
 import urllib.parse
 import uuid
 import warnings
+from collections import OrderedDict
 from datetime import timedelta
 from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Tuple, Union
 from urllib.parse import urljoin
@@ -130,6 +132,9 @@ class Session:
     """
 
     MAX_REDIRECTS = 30
+    # Go clients kept per session, one per transport configuration (protocol, timeout,
+    # verify, ...). Least recently used ones are closed beyond this.
+    MAX_TRANSPORTS = 8
 
     def __init__(
         self,
@@ -224,9 +229,15 @@ class Session:
                     "use client_identifier=None with a ja3_string to control pseudo headers."
                 )
 
-        self._session_id = str(uuid.uuid4())
-        self._go_client_config: Optional[str] = None  # config the live Go client was created with
-        self._go_client_broken = False  # the library stored a nil client under this id
+        # transport configuration -> Go session id. The Go library caches one client per
+        # id and builds it from the first request it sees, so each configuration needs its
+        # own id; sharing one made concurrent requests run on each other's settings.
+        self._go_clients: "OrderedDict[str, str]" = OrderedDict()
+        self._go_clients_lock = threading.Lock()
+        # ids whose client failed to build: the library holds a nil client under them, and
+        # destroying one panics inside Go and takes the process down
+        self._broken_go_ids: set = set()
+        self._warned_http_versions: set = set()
 
         # requests-compatible public state
         self.headers: CaseInsensitiveDict = CaseInsensitiveDict()
@@ -300,15 +311,15 @@ class Session:
             pass
 
     def close(self) -> None:
-        """Destroy the Go-side session (connections, TLS session cache)."""
-        if self._go_client_config is None:
+        """Destroy every Go-side client of this session (connections, TLS session caches)."""
+        lock = getattr(self, "_go_clients_lock", None)
+        if lock is None:  # __init__ raised before the pool existed
             return
-        self._go_client_config = None
-        if self._go_client_broken:
-            # destroying a session whose client failed to build panics inside Go and takes the
-            # process down; abandon the id instead (one unused map entry inside the library)
-            return
-        _cffi.call("destroySession", {"sessionId": self._session_id})
+        with lock:
+            ids = list(self._go_clients.values())
+            self._go_clients.clear()
+        for go_id in ids:
+            self._destroy_go_session(go_id)
 
     def reset_connection(self) -> None:
         """Drop the underlying connection pool; the next request performs a fresh TLS handshake."""
@@ -316,7 +327,38 @@ class Session:
 
     @property
     def session_id(self) -> str:
-        return self._session_id
+        """Go session id of the client the session's current settings use."""
+        return self._go_session_for(self._transport_config(self.timeout, self.verify))
+
+    # ------------------------------------------------------------------ Go client pool
+
+    def _go_session_for(self, config: str) -> str:
+        """Go session id for a transport configuration, created on first use (LRU)."""
+        evicted: List[str] = []
+        with self._go_clients_lock:
+            go_id = self._go_clients.get(config)
+            if go_id is not None:
+                self._go_clients.move_to_end(config)
+                return go_id
+            go_id = str(uuid.uuid4())
+            self._go_clients[config] = go_id
+            while len(self._go_clients) > self.MAX_TRANSPORTS:
+                evicted.append(self._go_clients.popitem(last=False)[1])
+        for old in evicted:
+            self._destroy_go_session(old)
+        return go_id
+
+    def _forget_go_session(self, config: str, go_id: str, broken: bool) -> None:
+        with self._go_clients_lock:
+            if self._go_clients.get(config) == go_id:
+                del self._go_clients[config]
+        if broken:
+            self._broken_go_ids.add(go_id)
+
+    def _destroy_go_session(self, go_id: str) -> None:
+        if go_id in self._broken_go_ids:
+            return  # a nil client: abandon the id rather than crash the process
+        _cffi.call("destroySession", {"sessionId": go_id})
 
     # ------------------------------------------------------------------ transport protocol
 
@@ -342,6 +384,12 @@ class Session:
         self._warn_about_http_version(version)
         self._validate_transport()
 
+    def _transport_flags(self, http_version: Any = _UNSET) -> Tuple[bool, bool, bool]:
+        """(force_http1, disable_http3, with_protocol_racing) for one request."""
+        if http_version is _UNSET:
+            return self.force_http1, self.disable_http3, self.with_protocol_racing
+        return HTTP_VERSIONS[normalize_http_version(http_version)]
+
     def _warn_about_http_version(self, version: str) -> None:
         identifier = self.client_identifier
         if identifier is None:
@@ -361,18 +409,21 @@ class Session:
                 stacklevel=3,
             )
 
-    def _validate_transport(self, proxy: str = "") -> None:
+    def _validate_transport(self, proxy: str = "", flags: Optional[Tuple[bool, bool, bool]] = None) -> None:
         """Reject option combinations the Go library refuses.
 
         Not a nicety: a rejected config makes the shared library store a nil client under this
         session id, and destroying that session afterwards panics inside Go, which takes the
         whole process down. Catching it here keeps that from happening.
         """
-        if self.with_protocol_racing and self.force_http1:
+        force_http1, disable_http3, racing = flags or (
+            self.force_http1, self.disable_http3, self.with_protocol_racing
+        )
+        if racing and force_http1:
             raise SessionConfigurationError(
                 "http_version=3 (protocol racing) cannot be combined with force_http1"
             )
-        if self.with_protocol_racing and self.disable_http3:
+        if racing and disable_http3:
             raise SessionConfigurationError(
                 "http_version=3 (protocol racing) cannot be combined with disable_http3"
             )
@@ -381,7 +432,7 @@ class Session:
         if self.certificate_pinning and not self.verify:
             raise SessionConfigurationError("certificate_pinning cannot be used with verify=False")
         proxy = proxy or self._resolve_proxy(None)
-        if self.with_protocol_racing and proxy:
+        if racing and proxy:
             scheme = proxy.split("://", 1)[0].lower() if "://" in proxy else ""
             if scheme not in ("socks5", "socks5h"):
                 raise SessionConfigurationError(
@@ -536,8 +587,15 @@ class Session:
         payload.update({k: v for k, v in optional.items() if v is not None})
         return payload
 
-    def _transport_config(self, timeout: Optional[float], verify: bool) -> str:
+    def _transport_config(
+        self,
+        timeout: Optional[float],
+        verify: bool,
+        flags: Optional[Tuple[bool, bool, bool]] = None,
+    ) -> str:
         values = {name: getattr(self, name) for name in _TRANSPORT_FIELDS}
+        if flags is not None:
+            values["force_http1"], values["disable_http3"], values["with_protocol_racing"] = flags
         values["timeout"] = timeout
         values["verify"] = verify
         return _json.dumps(values, sort_keys=True, default=str)
@@ -553,10 +611,17 @@ class Session:
         timeout: Optional[float],
         proxy: str,
         verify: bool,
+        go_session_id: Optional[str] = None,
+        flags: Optional[Tuple[bool, bool, bool]] = None,
     ) -> Dict[str, Any]:
+        force_http1, disable_http3, racing = flags or (
+            self.force_http1, self.disable_http3, self.with_protocol_racing
+        )
         is_bytes = isinstance(body, (bytes, bytearray))
         payload: Dict[str, Any] = {
-            "sessionId": self._session_id,
+            "sessionId": go_session_id or self._go_session_for(
+                self._transport_config(timeout, verify, (force_http1, disable_http3, racing))
+            ),
             "requestUrl": url,
             "requestMethod": method,
             "requestBody": base64.b64encode(body).decode() if is_bytes else body,
@@ -568,10 +633,10 @@ class Session:
             "proxyUrl": proxy,
             "isRotatingProxy": False,
             "followRedirects": False,  # redirects are handled here so history/cookies stay in Python
-            "forceHttp1": self.force_http1,
-            "disableHttp3": self.disable_http3,
+            "forceHttp1": force_http1,
+            "disableHttp3": disable_http3,
             "disableSessionTickets": self.disable_session_tickets,
-            "withProtocolRacing": self.with_protocol_racing,
+            "withProtocolRacing": racing,
             "insecureSkipVerify": not verify,
             "disableIPV4": self.disable_ipv4,
             "disableIPV6": self.disable_ipv6,
@@ -625,6 +690,7 @@ class Session:
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
         files: FilesInput = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a request. The verb methods (``get``, ``post``, ...) call this.
 
@@ -645,6 +711,10 @@ class Session:
                          ``headers`` mapping is used
         host_override    value of the Host header / :authority when it must differ
                          from the URL
+        http_version     transport for this request only ("auto", "1.1", "2", "3",
+                         see HTTP_VERSIONS); without it ``self.http_version`` is used.
+                         Each transport gets its own pooled connection, so concurrent
+                         requests with different versions do not disturb each other
         """
         method = method.upper()
         merged_params = {**self.params, **(params or {})} if (self.params or params) else None
@@ -657,18 +727,26 @@ class Session:
         verify = self.verify if verify is None else verify
         timeout = self.timeout if timeout is _UNSET else timeout
         proxy_url = self._resolve_proxy(proxy if proxy is not None else proxies)
-        self._validate_transport(proxy_url)
+        flags = self._transport_flags(http_version)
+        if http_version is not _UNSET:
+            version = normalize_http_version(http_version)
+            if version not in self._warned_http_versions:
+                self._warned_http_versions.add(version)
+                self._warn_about_http_version(version)
+        self._validate_transport(proxy_url, flags)
 
         history: List[Response] = []
         start = time.perf_counter()
 
         while True:
-            self._ensure_go_client(timeout, verify)
+            config = self._transport_config(timeout, verify, flags)
+            go_id = self._go_session_for(config)
             order = self._effective_header_order(request_headers, header_order)
             request_cookies = [] if "cookie" in request_headers else self._cookies_for_url(url, cookies)
 
             payload = self._build_payload(
-                method, url, request_headers, order, body, request_cookies, timeout, proxy_url, verify
+                method, url, request_headers, order, body, request_cookies, timeout, proxy_url, verify,
+                go_session_id=go_id, flags=flags,
             )
             if host_override:
                 payload["requestHostOverride"] = host_override
@@ -677,8 +755,8 @@ class Session:
             if result.get("status") == 0:
                 message = result.get("body", "unknown tls-client error")
                 if "failed to build client" in message or "invalid config" in message:
-                    self._go_client_broken = True
-                    self._renew_session_id()
+                    # the library now holds a nil client under this id; never destroy it
+                    self._forget_go_session(config, go_id, broken=True)
                 raise TLSClientException(message)
 
             jar = extract_cookies_to_jar(
@@ -708,28 +786,6 @@ class Session:
                 for h in ("content-length", "content-type", "transfer-encoding"):
                     request_headers.pop(h, None)
 
-    def _renew_session_id(self) -> None:
-        """Leave a broken Go-side session behind and continue under a fresh id."""
-        self._session_id = str(uuid.uuid4())
-        self._go_client_config = None
-        self._go_client_broken = False
-
-    def _ensure_go_client(self, timeout: Optional[float], verify: bool) -> None:
-        """Rebuild the Go client when a transport-level option changed since it was created.
-
-        The Go library caches one client per sessionId and only proxy/redirect settings can
-        be changed in place; force_http1, profile, timeout etc. would otherwise be ignored.
-        """
-        config = self._transport_config(timeout, verify)
-        if self._go_client_config is None:
-            self._go_client_config = config
-        elif config != self._go_client_config:
-            if self._go_client_broken:
-                self._renew_session_id()
-            else:
-                _cffi.call("destroySession", {"sessionId": self._session_id})
-            self._go_client_config = config
-
     # ------------------------------------------------------------------ verbs
 
     def request(
@@ -750,6 +806,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a request with an arbitrary method.
 
@@ -771,6 +828,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def get(
@@ -790,6 +848,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a GET request.
 
@@ -811,6 +870,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def options(
@@ -830,6 +890,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send an OPTIONS request.
 
@@ -851,6 +912,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def head(
@@ -870,6 +932,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a HEAD request (redirects are not followed by default).
 
@@ -891,6 +954,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def post(
@@ -910,6 +974,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a POST request.
 
@@ -931,6 +996,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def put(
@@ -950,6 +1016,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a PUT request.
 
@@ -971,6 +1038,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def patch(
@@ -990,6 +1058,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a PATCH request.
 
@@ -1011,6 +1080,7 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     def delete(
@@ -1030,6 +1100,7 @@ class Session:
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:
         """Send a DELETE request.
 
@@ -1051,4 +1122,5 @@ class Session:
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )

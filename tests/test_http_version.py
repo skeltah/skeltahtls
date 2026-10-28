@@ -84,7 +84,7 @@ def test_payload_flags():
         assert payload["withProtocolRacing"] is racing
 
 
-def test_switching_rebuilds_the_go_client():
+def test_switching_selects_a_different_go_client():
     s = Session()
     auto = s._transport_config(30, True)
     s.http_version = 1

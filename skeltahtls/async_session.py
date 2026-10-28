@@ -13,7 +13,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 from .response import Response
 from .cookiejar import CookieInput
-from .session import _UNSET, ProxyInput, Session
+from .session import _UNSET, HttpVersionArg, ProxyInput, Session
 
 
 class AsyncSession(Session):
@@ -66,6 +66,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a request with an arbitrary method.
 
@@ -87,6 +88,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def get(
@@ -106,6 +108,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a GET request.
 
@@ -127,6 +130,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def options(
@@ -146,6 +150,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send an OPTIONS request.
 
@@ -167,6 +172,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def head(
@@ -186,6 +192,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a HEAD request (redirects are not followed by default).
 
@@ -207,6 +214,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def post(
@@ -226,6 +234,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a POST request.
 
@@ -247,6 +256,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def put(
@@ -266,6 +276,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a PUT request.
 
@@ -287,6 +298,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def patch(
@@ -306,6 +318,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a PATCH request.
 
@@ -327,6 +340,7 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
 
     async def delete(
@@ -346,6 +360,7 @@ class AsyncSession(Session):
         proxies: ProxyInput = None,
         header_order: Optional[Sequence[str]] = None,
         host_override: Optional[str] = None,
+        http_version: HttpVersionArg = _UNSET,  # type: ignore[assignment]
     ) -> Response:  # type: ignore[override]
         """Send a DELETE request.
 
@@ -367,4 +382,5 @@ class AsyncSession(Session):
             proxies=proxies,
             header_order=header_order,
             host_override=host_override,
+            http_version=http_version,
         )
