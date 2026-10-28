@@ -73,3 +73,31 @@ def test_remove_and_dict_api():
 def test_session_accepts_cookies_input():
     s = Session(cookies=EXPORT)
     assert s.cookies["uaid"] == "u1"
+
+
+def test_set_cookie_accepts_a_browser_export_dict():
+    """The stdlib method only takes Cookie objects; a dict used to die on cookie.value."""
+    j = CookieJar().load(EXPORT)
+    j.set_cookie({"name": "datadome", "value": "fresh"})
+    c = j.get_cookie("datadome")
+    assert (c.value, c.domain, c.expires) == ("fresh", ".etsy.com", 1800000000)  # replaced in place
+    assert len(j) == 2
+
+    j.set_cookie({"name": "new_one", "value": "1", "domain": ".etsy.com", "secure": True})
+    assert j.get_cookie("new_one").secure is True
+
+
+def test_set_cookie_explains_what_it_takes():
+    import pytest
+    j = CookieJar()
+    with pytest.raises(TypeError, match="'name' and 'value'"):
+        j.set_cookie({"name": "datadome"})
+    with pytest.raises(TypeError, match=r"cookies\.set\(name, value"):
+        j.set_cookie("datadome=abc")
+
+
+def test_stdlib_set_cookie_path_still_works():
+    from skeltahtls.cookies import create_cookie
+    j = CookieJar()
+    j.set_cookie(create_cookie("a", "1", domain=".example.com"))
+    assert j["a"] == "1"

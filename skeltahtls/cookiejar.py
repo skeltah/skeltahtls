@@ -59,7 +59,23 @@ class CookieJar(RequestsCookieJar):
 
     # ------------------------------------------------------------------ core: one cookie per identity
 
-    def set_cookie(self, cookie: Cookie, *args: Any, **kwargs: Any) -> None:
+    def set_cookie(self, cookie: Union[Cookie, Mapping[str, Any]], *args: Any, **kwargs: Any) -> None:
+        if isinstance(cookie, Mapping):
+            # set_cookie({"name": ..., "value": ..., "domain": ...}): the shape of one entry
+            # of a browser export. The stdlib method only takes Cookie objects, and failing
+            # on cookie.value deep inside it does not tell anyone what to do instead.
+            if "name" not in cookie or "value" not in cookie:
+                raise TypeError(
+                    "set_cookie() with a dict needs 'name' and 'value' keys (plus optional "
+                    f"'domain', 'path', 'expires', 'secure', 'httpOnly'), got keys {sorted(cookie)}"
+                )
+            self._load_export_dict(cookie, None, "/")
+            return None
+        if not isinstance(cookie, Cookie):
+            raise TypeError(
+                f"set_cookie() takes an http.cookiejar.Cookie or a dict, got {type(cookie).__name__}; "
+                "for a name and a value use cookies.set(name, value, domain=...)"
+            )
         if isinstance(cookie.value, str) and cookie.value.startswith('"') and cookie.value.endswith('"'):
             cookie.value = cookie.value.replace('\\"', "")
 

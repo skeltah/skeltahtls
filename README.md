@@ -20,7 +20,7 @@ r.json()["tls"]["ja4"]                         # t13d1517h2_8daaf6152771_cb7bf58
 ```bash
 pip install skeltahtls                                                # PyPI
 pip install git+https://github.com/skeltah/skeltahtls.git             # прямо из репозитория (нужен git)
-pip install git+https://github.com/skeltah/skeltahtls.git@v1.17.1.2   # конкретная версия
+pip install git+https://github.com/skeltah/skeltahtls.git@v1.17.1.3   # конкретная версия
 pip install -e .                                                      # dev-режим из клона
 ```
 
