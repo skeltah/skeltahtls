@@ -1,85 +1,85 @@
 {
   "version": "1.18.1-2-gbf1ecb2",
   "source": "https://github.com/bogdanfinn/tls-client/tree/bf1ecb2cbf592645eb36d2010f86a3822ccab862",
-  "updated": "2026-11-17T14:28:41+00:00",
+  "updated": "2026-11-17T14:37:50+00:00",
   "files": {
     "tls-client-darwin-arm64.dylib": {
-      "source": "https://github.com/bogdanfinn/tls-client/releases/download/v1.16.0/tls-client-darwin-arm64-1.16.0.dylib",
-      "sha256": "99984d013921c753ab29d28720cb099eff6adf63538347e13652cb5cfe5bdc02",
-      "size": 11884770,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig n/a",
+      "sha256": "6bb280fac50c156cbac42c373255369423d764c789dd5c504fc49eb0ffe64ac3",
+      "size": 11668994,
       "features": {
-        "custom_client_grease_mldsa_sigalgs": false
-      },
-      "version": "1.16.0"
+        "custom_client_grease_mldsa_sigalgs": true
+      }
     },
     "tls-client-darwin-amd64.dylib": {
-      "source": "https://github.com/bogdanfinn/tls-client/releases/download/v1.16.0/tls-client-darwin-amd64-1.16.0.dylib",
-      "sha256": "6463457ea713a96b3b8c94fd9d8746e7bc510cb6784fcf0f4bb64d9c83e3251a",
-      "size": 12584208,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig n/a",
+      "sha256": "3e3c636492416538ae16e9ab6042f413be255dce5a1d9d5e47379567116d800c",
+      "size": 12513600,
       "features": {
-        "custom_client_grease_mldsa_sigalgs": false
-      },
-      "version": "1.16.0"
+        "custom_client_grease_mldsa_sigalgs": true
+      }
     },
     "tls-client-windows-amd64.dll": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "29b1f509371f74532b5fbceac8c610c01d675bb2a0ffe4d99fd00fabc17a9c55",
-      "size": 12912640,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "730ffbb14a258503626782faaddeea66cc74da4f68fe160bf25847830a66c14f",
+      "size": 12922368,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-windows-386.dll": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "03561f0a7dc143b41fc4c173c412ff6b20a92070f334dcae963fd32ab40091cf",
-      "size": 12525056,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "94f966b92972175126449d7ae430cf249cae3d9ee38e428a8be32baafebf9f1c",
+      "size": 12534272,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-amd64.so": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "728552fd82d10c84db8da84ff50949508fd65fe781bf53751b42518d47989df1",
-      "size": 14984608,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "9ac8d41f1b8dedb022cb5f22a1f30bf651425a1ee12b2184acb7ff64113c515f",
+      "size": 14992960,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-musl-amd64.so": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "bfa0e3ac0ec7354d3f4a756a22d76075493feedd9ba41cbee51b2e7361debb00",
-      "size": 14979168,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "cf90ed9bd93b8fbf4f14f17edc81f4dd42267211858ae1062f80962252fb3993",
+      "size": 14987992,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-arm64.so": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "950907abb6327947a052375d8da1a3e76d50777e74a61cf897508008150089bb",
-      "size": 14015904,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "992b9d7823e458b9f37b924b2adb6260f661e737d86a13503c61b5c4dc3eab4f",
+      "size": 14024040,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-armv7.so": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "6b89004d1e8580b5c8562e977054fb0f6cdea7c002162c605089c7561ef3f97e",
-      "size": 14762264,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "b5904dc9df405a567208398c12b02ca4ac19a1b82e06db2ca62f88a07d59e353",
+      "size": 14769864,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-386.so": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
-      "sha256": "f18169a9bea731ab0cef526bfb91306b72f5b83e694954112b1d1ac575941058",
-      "size": 13855956,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
+      "sha256": "15b6fa635835b362c38a06de7664f90019517d1fe152d66a356847e6de17d1cf",
+      "size": 13863252,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }

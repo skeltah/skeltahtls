@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.9", "3.12"]
+        python: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,8 +54,16 @@ jobs:
         if: contains(matrix.platform, 'arm')
       - name: Load the library and send a request
         run: |
-          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
-            ${{ matrix.image }} python scripts/smoke_test.py
+          set +e
+          out=$(docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            ${{ matrix.image }} python scripts/smoke_test.py 2>&1)
+          code=$?
+          echo "$out"
+          # the tail as an annotation: readable on the run page without opening the log
+          if [ $code -ne 0 ]; then
+            echo "::error title=smoke ${{ matrix.name }}::$(echo "$out" | tail -n 12 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+          fi
+          exit $code
 
   wheels:
     # every per-platform wheel holds exactly its own library

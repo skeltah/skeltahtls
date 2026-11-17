@@ -107,7 +107,7 @@ def main() -> int:
         run(["git", "clone", "-q", "--depth", "1", "--branch", ref, REPO, str(src)])
         commit = run(["git", "rev-parse", "HEAD"], cwd=src).stdout.strip()
         # the shallow clone has no tags; fetch enough history for describe to find the last one
-        run(["git", "fetch", "-q", "--depth", "200", "origin", "+refs/tags/*:refs/tags/*"], cwd=src, check=False)
+        run(["git", "fetch", "-q", "--deepen", "200", "--tags", "origin"], cwd=src, check=False)
         # a tag gives its own name, a branch gives "<last tag>-<commits>-g<sha>"
         described = run(["git", "describe", "--tags", "--always"], cwd=src, check=False).stdout.strip()
         version = (described or ref).lstrip("v")
