@@ -20,7 +20,6 @@ TARGETS = {
     "linux-386": ("tls-client-linux-386.so", "manylinux_2_17_i686.manylinux2014_i686"),
     "linux-arm64": ("tls-client-linux-arm64.so", "manylinux_2_17_aarch64.manylinux2014_aarch64"),
     "linux-armv7": ("tls-client-linux-armv7.so", "manylinux_2_17_armv7l.manylinux2014_armv7l"),
-    "linux-musl-amd64": ("tls-client-linux-musl-amd64.so", "musllinux_1_2_x86_64"),
     "darwin-arm64": ("tls-client-darwin-arm64.dylib", "macosx_12_0_arm64"),
     "darwin-amd64": ("tls-client-darwin-amd64.dylib", "macosx_12_0_x86_64"),
 }

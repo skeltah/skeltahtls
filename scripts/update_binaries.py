@@ -37,7 +37,7 @@ ASSETS = {
     "tls-client-darwin-arm64-{v}.dylib": "tls-client-darwin-arm64.dylib",
     "tls-client-darwin-amd64-{v}.dylib": "tls-client-darwin-amd64.dylib",
     "tls-client-linux-ubuntu-amd64-{v}.so": "tls-client-linux-amd64.so",
-    "tls-client-linux-alpine-amd64-{v}.so": "tls-client-linux-musl-amd64.so",
+    "tls-client-xgo-{v}-linux-386.so": "tls-client-linux-386.so",
     "tls-client-linux-arm64-{v}.so": "tls-client-linux-arm64.so",
     "tls-client-linux-armv7-{v}.so": "tls-client-linux-armv7.so",
 }

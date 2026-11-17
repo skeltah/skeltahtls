@@ -48,15 +48,6 @@
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
-    "tls-client-linux-musl-amd64.so": {
-      "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "cf90ed9bd93b8fbf4f14f17edc81f4dd42267211858ae1062f80962252fb3993",
-      "size": 14987992,
-      "features": {
-        "custom_client_grease_mldsa_sigalgs": true
-      }
-    },
     "tls-client-linux-arm64.so": {
       "version": "1.18.1-2-gbf1ecb2",
       "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",

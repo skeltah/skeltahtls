@@ -32,6 +32,15 @@ def shared_library_name() -> str:
     if sys.platform == "darwin":
         return "tls-client-darwin-arm64.dylib" if machine in ("arm64", "aarch64") else "tls-client-darwin-amd64.dylib"
 
+    if _is_musl():
+        # Go's c-shared runtime uses initial-exec TLS, which musl's dlopen refuses ("initial-exec
+        # TLS resolves to dynamic definition"); upstream's own alpine build fails the same way,
+        # and LD_PRELOAD crashes instead. Checked in alpine containers, see the CI history.
+        raise OSError(
+            "skeltahtls cannot run on musl libc (Alpine): the tls-client Go library cannot be "
+            "loaded with dlopen there. Use a glibc-based image such as python:3.x-slim."
+        )
+
     # linux / other unix. The machine name is the kernel's, so a 32-bit userland on a
     # 64-bit kernel (Raspberry Pi OS, i386 containers) reports aarch64 / x86_64; the
     # pointer size of this interpreter is what decides which library it can load.
@@ -40,8 +49,6 @@ def shared_library_name() -> str:
     if machine in ("x86_64", "amd64", "i386", "i486", "i586", "i686", "x86"):
         if not is_64:
             return "tls-client-linux-386.so"
-        if _is_musl():
-            return "tls-client-linux-musl-amd64.so"
         return "tls-client-linux-amd64.so"
     raise OSError(
         f"skeltahtls has no tls-client library for {sys.platform}/{platform.machine()}; "

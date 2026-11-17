@@ -21,7 +21,6 @@ def fake(monkeypatch):
     ("darwin", "arm64", 64, False, "tls-client-darwin-arm64.dylib"),
     ("darwin", "x86_64", 64, False, "tls-client-darwin-amd64.dylib"),
     ("linux", "x86_64", 64, False, "tls-client-linux-amd64.so"),
-    ("linux", "x86_64", 64, True, "tls-client-linux-musl-amd64.so"),
     ("linux", "x86_64", 32, False, "tls-client-linux-386.so"),     # i386 container on a 64-bit kernel
     ("linux", "i686", 32, False, "tls-client-linux-386.so"),
     ("linux", "aarch64", 64, False, "tls-client-linux-arm64.so"),
@@ -30,6 +29,11 @@ def fake(monkeypatch):
 ])
 def test_library_choice(fake, system, machine, bits, musl, expected):
     assert fake(system, machine, bits, musl) == expected
+
+
+def test_musl_says_why_it_cannot_work(fake):
+    with pytest.raises(OSError, match="musl libc .Alpine.*glibc-based image"):
+        fake("linux", "x86_64", 64, musl=True)
 
 
 def test_unknown_architecture_says_so(fake):

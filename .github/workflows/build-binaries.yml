@@ -1,7 +1,7 @@
 # Rebuild the tls-client shared libraries from a bogdanfinn/tls-client ref.
 # Linux + Windows are cross compiled with zig on ubuntu; macOS is built natively.
-# Every Linux library is then loaded in a container of its own platform (alpine for musl,
-# i386, arm64 and armv7 through qemu) and sends one real request.
+# Every Linux library is then loaded in a container of its own platform (i386, and arm64 /
+# armv7 through qemu) and sends one real request.
 # Result: a branch "binaries/<ref>" with the new files + manifest - merge the files you
 # want, run scripts/gen_profiles.py and check the Chrome defaults / test hashes.
 #
@@ -26,7 +26,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            targets: windows-amd64 windows-386 linux-amd64 linux-386 linux-musl-amd64 linux-arm64 linux-armv7
+            targets: windows-amd64 windows-386 linux-amd64 linux-386 linux-arm64 linux-armv7
             files: "*.dll *.so"
           - os: macos-latest
             targets: darwin-arm64 darwin-amd64
@@ -75,12 +75,12 @@ jobs:
           - name: glibc x86_64
             image: python:3.12-slim
             platform: linux/amd64
-          - name: musl x86_64 (alpine)
-            image: python:3.12-alpine
-            platform: linux/amd64
           - name: glibc i386
             image: i386/python:3.12-slim
             platform: linux/386
+            # Docker's default seccomp profile answers socketcall(2) - how 32-bit Go opens
+            # sockets - with ENOSYS; outside Docker it just works
+            opts: --security-opt seccomp=unconfined
           - name: glibc arm64
             image: python:3.12-slim
             platform: linux/arm64
@@ -99,8 +99,8 @@ jobs:
       - name: Load the library and send a request
         run: |
           set +e
-          out=$(docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
-            ${{ matrix.image }} python scripts/smoke_test.py 2>&1)
+          out=$(docker run --rm --platform ${{ matrix.platform }} ${{ matrix.opts }} -v "$PWD:/src" -w /src \
+            ${{ matrix.image }} python -u -X faulthandler scripts/smoke_test.py 2>&1)
           code=$?
           echo "$out"
           # the tail as an annotation: readable on the run page without opening the log

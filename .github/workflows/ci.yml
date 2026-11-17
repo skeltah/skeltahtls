@@ -36,12 +36,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: musl x86_64 (alpine)
-            image: python:3.12-alpine
-            platform: linux/amd64
           - name: glibc i386
             image: i386/python:3.12-slim
             platform: linux/386
+            # Docker's default seccomp profile answers socketcall(2) - how 32-bit Go opens
+            # sockets - with ENOSYS; outside Docker it just works
+            opts: --security-opt seccomp=unconfined
           - name: glibc arm64
             image: python:3.12-slim
             platform: linux/arm64
@@ -55,8 +55,8 @@ jobs:
       - name: Load the library and send a request
         run: |
           set +e
-          out=$(docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
-            ${{ matrix.image }} python scripts/smoke_test.py 2>&1)
+          out=$(docker run --rm --platform ${{ matrix.platform }} ${{ matrix.opts }} -v "$PWD:/src" -w /src \
+            ${{ matrix.image }} python -u -X faulthandler scripts/smoke_test.py 2>&1)
           code=$?
           echo "$out"
           # the tail as an annotation: readable on the run page without opening the log

@@ -23,7 +23,11 @@ no release behind them, so the release assets (and update_binaries.py) stop at v
 while the source has moved on.
 
 macOS targets need the Apple SDK and are skipped unless MACOS_SDK=/path/to/MacOSX.sdk is set
-(zig can then link against it); otherwise keep the upstream dylibs from update_binaries.py.
+(zig can then link against it), or run on a Mac.
+
+linux-386 is built with gcc inside quay.io/pypa/manylinux2014_i686 (needs docker): the zig
+build of it loads and then segfaults in the Go runtime, while the gcc one works (checked in
+an i386 container) and needs nothing newer than glibc 2.3.2.
 """
 from __future__ import annotations
 
@@ -34,7 +38,9 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -49,14 +55,42 @@ TARGETS = {
     "windows-amd64": ("windows", "amd64", "x86_64-windows-gnu", {}),
     "windows-386": ("windows", "386", "x86-windows-gnu", {}),
     "linux-amd64": ("linux", "amd64", "x86_64-linux-gnu.2.17", {}),
-    "linux-386": ("linux", "386", "x86-linux-gnu.2.17", {}),
-    "linux-musl-amd64": ("linux", "amd64", "x86_64-linux-musl", {}),
+    "linux-386": ("linux", "386", None, {}),  # gcc in DOCKER_IMAGES, see the docstring
     "linux-arm64": ("linux", "arm64", "aarch64-linux-gnu.2.17", {}),
     "linux-armv7": ("linux", "arm", "arm-linux-gnueabihf.2.17", {"GOARM": "7"}),
     "darwin-arm64": ("darwin", "arm64", "aarch64-macos", {}),
     "darwin-amd64": ("darwin", "amd64", "x86_64-macos", {}),
 }
 EXT = {"windows": ".dll", "linux": ".so", "darwin": ".dylib"}
+# targets built natively inside a container instead of with zig
+DOCKER_IMAGES = {"linux-386": ("quay.io/pypa/manylinux2014_i686", "linux/386")}
+
+
+def build_in_docker(name: str, src: Path, tmp: Path, go_version: str, out_name: str) -> subprocess.CompletedProcess:
+    """go build inside the target's own image with its own gcc and a Go toolchain for it."""
+    image, docker_platform = DOCKER_IMAGES[name]
+    goos, goarch = TARGETS[name][:2]
+    go_release = go_version.split()[2]  # "go1.27.4"
+    toolchain = tmp / f"go-{goos}-{goarch}"
+    if not toolchain.exists():
+        archive = tmp / f"{go_release}.{goos}-{goarch}.tar.gz"
+        url = f"https://go.dev/dl/{archive.name}"
+        print(f"   downloading {url}")
+        urllib.request.urlretrieve(url, archive)
+        toolchain.mkdir()
+        with tarfile.open(archive) as t:
+            t.extractall(toolchain)
+    modcache = run(["go", "env", "GOMODCACHE"]).stdout.strip()
+    run(["go", "mod", "download"], cwd=src / "cffi_dist")
+    return run([
+        "docker", "run", "--rm", "--platform", docker_platform,
+        "-v", f"{src}:/w", "-v", f"{toolchain}:/tc", "-v", f"{modcache}:/gomod", "-w", "/w/cffi_dist",
+        "-e", "GOMODCACHE=/gomod", "-e", "GOTOOLCHAIN=local", "-e", "GOFLAGS=-mod=mod",
+        "-e", "CGO_ENABLED=1", "-e", f"GOOS={goos}", "-e", f"GOARCH={goarch}",
+        "-e", "PATH=/tc/go/bin:/usr/local/bin:/usr/bin:/bin",
+        image, "go", "build", "-buildvcs=false", "-trimpath", "-ldflags=-s -w", "-buildmode=c-shared",
+        "-o", f"/w/cffi_dist/dist/{out_name}", ".",
+    ], check=False)
 
 
 def sha256_of(path: Path) -> str:
@@ -126,7 +160,15 @@ def main() -> int:
             out = DEP_DIR / f"tls-client-{name}{EXT[goos]}"
             print(f"== {name} -> {out.name}")
             env = dict(os.environ, GOOS=goos, GOARCH=goarch, CGO_ENABLED="1", **extra)
-            if zig:
+            tmp_out = dist / "dist" / out.name
+            tmp_out.parent.mkdir(exist_ok=True)
+            if name in DOCKER_IMAGES:
+                if not shutil.which("docker"):
+                    print(f"   skipped: needs docker ({DOCKER_IMAGES[name][0]})")
+                    continue
+                res = build_in_docker(name, src, Path(tmp), go_version, out.name)
+                toolchain_note = f"gcc in {DOCKER_IMAGES[name][0]}"
+            elif zig:
                 env["CC"], env["CXX"] = f"{zig} cc -target {zig_target}", f"{zig} c++ -target {zig_target}"
             elif goos != "darwin":
                 print("   skipped: zig required for cross compiling this target")
@@ -146,10 +188,11 @@ def main() -> int:
                         continue
                     env["CGO_CFLAGS"] = f"-isysroot {sdk}"
                     env["CGO_LDFLAGS"] = f"-isysroot {sdk} -F{sdk}/System/Library/Frameworks"
-            tmp_out = dist / "dist" / out.name
-            tmp_out.parent.mkdir(exist_ok=True)
-            res = run(["go", "build", "-trimpath", "-ldflags=-s -w", "-buildmode=c-shared", "-o", str(tmp_out), "."],
-                      cwd=dist, env=env, check=False)
+            if name not in DOCKER_IMAGES:
+                res = run(["go", "build", "-trimpath", "-ldflags=-s -w", "-buildmode=c-shared", "-o", str(tmp_out), "."],
+                          cwd=dist, env=env, check=False)
+                native_mac = goos == "darwin" and platform.system() == "Darwin"
+                toolchain_note = "clang" if native_mac else f"zig {zig_version}"
             if res.returncode != 0:
                 print("   FAILED:\n" + "\n".join("   " + l for l in (res.stderr or res.stdout).splitlines()[-15:]))
                 continue
@@ -157,7 +200,7 @@ def main() -> int:
             shutil.copyfile(tmp_out, out)
             manifest["files"][out.name] = {
                 "version": version,
-                "source": f"built from {REPO}@{ref} ({commit[:12]}) with {go_version.split()[2]} / zig {zig_version}",
+                "source": f"built from {REPO}@{ref} ({commit[:12]}) with {go_version.split()[2]} / {toolchain_note}",
                 "sha256": sha256_of(out),
                 "size": out.stat().st_size,
                 "features": {"custom_client_grease_mldsa_sigalgs": True},
