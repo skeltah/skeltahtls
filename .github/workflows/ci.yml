@@ -27,3 +27,43 @@ jobs:
       - name: Fingerprint tests (network, best effort)
         continue-on-error: true
         run: pytest -m network
+
+  containers:
+    # the bundled Linux libraries on the platforms the runners above do not cover
+    name: smoke ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: musl x86_64 (alpine)
+            image: python:3.12-alpine
+            platform: linux/amd64
+          - name: glibc i386
+            image: i386/python:3.12-slim
+            platform: linux/386
+          - name: glibc arm64
+            image: python:3.12-slim
+            platform: linux/arm64
+          - name: glibc armv7
+            image: python:3.12-slim
+            platform: linux/arm/v7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        if: contains(matrix.platform, 'arm')
+      - name: Load the library and send a request
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            ${{ matrix.image }} python scripts/smoke_test.py
+
+  wheels:
+    # every per-platform wheel holds exactly its own library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python scripts/build_wheels.py

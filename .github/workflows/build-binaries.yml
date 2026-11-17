@@ -1,15 +1,24 @@
-# Rebuild the tls-client shared libraries from a bogdanfinn/tls-client tag.
+# Rebuild the tls-client shared libraries from a bogdanfinn/tls-client ref.
 # Linux + Windows are cross compiled with zig on ubuntu; macOS is built natively.
-# Result: a branch "binaries/<tag>" with the new files + manifest - open a PR from it,
-# run scripts/gen_profiles.py and check the Chrome defaults / test hashes before merging.
+# Every Linux library is then loaded in a container of its own platform (alpine for musl,
+# i386, arm64 and armv7 through qemu) and sends one real request.
+# Result: a branch "binaries/<ref>" with the new files + manifest - merge the files you
+# want, run scripts/gen_profiles.py and check the Chrome defaults / test hashes.
+#
+# Start it from the Actions tab, or by pushing a tag:  git push origin build-binaries/master
 name: Build binaries
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "bogdanfinn/tls-client tag (e.g. v1.16.0)"
+        description: "bogdanfinn/tls-client tag or branch (e.g. v1.18.1, master)"
         required: true
+  push:
+    tags: ["build-binaries/*"]
+
+env:
+  REF: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -17,9 +26,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            targets: windows-amd64 windows-386 linux-amd64 linux-musl-amd64 linux-arm64 linux-armv7
+            targets: windows-amd64 windows-386 linux-amd64 linux-386 linux-musl-amd64 linux-arm64 linux-armv7
+            files: "*.dll *.so"
           - os: macos-latest
             targets: darwin-arm64 darwin-amd64
+            files: "*.dylib"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -30,15 +41,65 @@ jobs:
         if: runner.os == 'Linux'
         with:
           version: "0.16.0"
-      - run: python3 scripts/build_binaries.py ${{ inputs.tag }} ${{ matrix.targets }}
+      - name: Build
+        run: |
+          ref="${REF#build-binaries/}"
+          python3 scripts/build_binaries.py "$ref" ${{ matrix.targets }}
+      - name: Every target was built
+        run: |
+          for t in ${{ matrix.targets }}; do
+            ls skeltahtls/dependencies/tls-client-$t.* || { echo "missing $t"; exit 1; }
+          done
+      - name: Load the macOS libraries
+        if: runner.os == 'macOS'
+        run: |
+          python3 scripts/smoke_test.py
+          for f in skeltahtls/dependencies/*.dylib; do echo "$f"; otool -l "$f" | grep -A3 LC_BUILD_VERSION | grep minos; done
+      - name: Collect what this runner built (not the checked-out libraries of the other OS)
+        run: |
+          mkdir out
+          cd skeltahtls/dependencies
+          cp ${{ matrix.files }} manifest.json ../../out/
       - uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.os }}
-          path: |
-            skeltahtls/dependencies/*.dll
-            skeltahtls/dependencies/*.so
-            skeltahtls/dependencies/*.dylib
-            skeltahtls/dependencies/manifest.json
+          path: out/
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: glibc x86_64
+            image: python:3.12-slim
+            platform: linux/amd64
+          - name: musl x86_64 (alpine)
+            image: python:3.12-alpine
+            platform: linux/amd64
+          - name: glibc i386
+            image: i386/python:3.12-slim
+            platform: linux/386
+          - name: glibc arm64
+            image: python:3.12-slim
+            platform: linux/arm64
+          - name: glibc armv7
+            image: python:3.12-slim
+            platform: linux/arm/v7
+    name: smoke ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: binaries-ubuntu-latest
+          path: skeltahtls/dependencies
+      - uses: docker/setup-qemu-action@v3
+        if: contains(matrix.platform, 'arm')
+      - name: Load the library and send a request
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            ${{ matrix.image }} python scripts/smoke_test.py
 
   commit:
     needs: build
@@ -58,18 +119,19 @@ jobs:
           manifest = json.loads((dep / "manifest.json").read_text())
           for art in pathlib.Path("artifacts").iterdir():
               part = json.loads((art / "manifest.json").read_text())
-              manifest["files"].update(part["files"])
+              built = {f.name for f in art.iterdir() if f.suffix in (".dll", ".so", ".dylib")}
+              manifest["files"].update({k: v for k, v in part["files"].items() if k in built})
               manifest.update({k: part[k] for k in ("version", "source", "updated")})
-              for f in art.iterdir():
-                  if f.suffix in (".dll", ".so", ".dylib"):
-                      shutil.copyfile(f, dep / f.name)
+              for name in built:
+                  shutil.copyfile(art / name, dep / name)
           (dep / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
           PY
       - name: Push branch
         run: |
+          ref="${REF#build-binaries/}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "binaries/${{ inputs.tag }}"
+          git checkout -b "binaries/$ref"
           git add skeltahtls/dependencies
-          git commit -m "Rebuild tls-client binaries from ${{ inputs.tag }}"
-          git push -u origin "binaries/${{ inputs.tag }}"
+          git commit -m "Rebuild tls-client binaries from $ref"
+          git push -f -u origin "binaries/$ref"

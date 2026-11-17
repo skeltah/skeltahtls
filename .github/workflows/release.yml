@@ -1,5 +1,9 @@
-# Push a tag like v1.16.0.2 -> build sdist + wheel -> publish to PyPI (trusted publishing,
-# no tokens) -> attach the wheel to a GitHub Release.
+# Push a tag like v1.18.1.1 -> build the sdist + one wheel per platform -> publish to PyPI
+# (trusted publishing, no tokens) -> attach them to a GitHub Release.
+#
+# Each wheel holds only its own tls-client library (setup.py, scripts/build_wheels.py), so
+# pip downloads ~15 MB instead of every platform's. The sdist keeps all of them as the
+# fallback for platforms without a wheel.
 #
 # One-time setup on pypi.org: Your account -> Publishing -> Add a new pending publisher:
 #   PyPI project name: skeltahtls | Owner: <github user> | Repository: skeltahtls
@@ -20,11 +24,17 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install build
-      - run: python -m build
       - name: Check version matches tag
         run: |
           v=$(python -c "import skeltahtls; print(skeltahtls.__version__)")
           test "v$v" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != package version $v"; exit 1; }
+      - name: Build sdist and per-platform wheels
+        run: python scripts/build_wheels.py
+      - name: Install the linux wheel and load it
+        run: |
+          python -m venv /tmp/v
+          /tmp/v/bin/pip install dist/*manylinux*x86_64.whl
+          cd /tmp && /tmp/v/bin/python -c "import skeltahtls, skeltahtls._cffi as c; c._load(); print(skeltahtls.__version__, skeltahtls.library_version())"
       - uses: actions/upload-artifact@v4
         with:
           name: dist
