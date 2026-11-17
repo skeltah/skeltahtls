@@ -67,6 +67,8 @@ jobs:
 
   smoke:
     needs: build
+    # runs when only the macOS leg failed or was never picked up (macOS runner capacity)
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -111,6 +113,8 @@ jobs:
 
   commit:
     needs: build
+    # commits whatever was built; a missing OS keeps the libraries already in the repo
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
