@@ -49,6 +49,7 @@ TARGETS = {
     "windows-amd64": ("windows", "amd64", "x86_64-windows-gnu", {}),
     "windows-386": ("windows", "386", "x86-windows-gnu", {}),
     "linux-amd64": ("linux", "amd64", "x86_64-linux-gnu.2.17", {}),
+    "linux-386": ("linux", "386", "x86-linux-gnu.2.17", {}),
     "linux-musl-amd64": ("linux", "amd64", "x86_64-linux-musl", {}),
     "linux-arm64": ("linux", "arm64", "aarch64-linux-gnu.2.17", {}),
     "linux-armv7": ("linux", "arm", "arm-linux-gnueabihf.2.17", {"GOARM": "7"}),
@@ -105,6 +106,8 @@ def main() -> int:
         src = Path(tmp) / "tls-client"
         run(["git", "clone", "-q", "--depth", "1", "--branch", ref, REPO, str(src)])
         commit = run(["git", "rev-parse", "HEAD"], cwd=src).stdout.strip()
+        # the shallow clone has no tags; fetch enough history for describe to find the last one
+        run(["git", "fetch", "-q", "--depth", "200", "origin", "+refs/tags/*:refs/tags/*"], cwd=src, check=False)
         # a tag gives its own name, a branch gives "<last tag>-<commits>-g<sha>"
         described = run(["git", "describe", "--tags", "--always"], cwd=src, check=False).stdout.strip()
         version = (described or ref).lstrip("v")
@@ -113,6 +116,10 @@ def main() -> int:
         gomod.write_text(gomod.read_text() + "\n// build against the checked-out source instead of the pinned release\n"
                          "replace github.com/bogdanfinn/tls-client => ../\n")
         run(["go", "mod", "tidy"], cwd=dist)
+        # go.mod may ask for a newer Go than the one on PATH (GOTOOLCHAIN=auto switches to
+        # it); record the toolchain that actually builds
+        go_version = run(["go", "version"], cwd=dist).stdout.strip()
+        print(f"building with {go_version}")
 
         for name in wanted:
             goos, goarch, zig_target, extra = TARGETS[name]
@@ -128,7 +135,10 @@ def main() -> int:
                 if platform.system() == "Darwin":
                     # native toolchain (Xcode CLT) handles both arches, no zig needed
                     arch = "arm64" if goarch == "arm64" else "x86_64"
-                    env["CC"], env["CXX"] = f"clang -arch {arch}", f"clang++ -arch {arch}"
+                    # the wheels are tagged macosx_12_0 (Go 1.25+ needs macOS 12 anyway)
+                    env["CC"] = f"clang -arch {arch} -mmacosx-version-min=12.0"
+                    env["CXX"] = f"clang++ -arch {arch} -mmacosx-version-min=12.0"
+                    env["MACOSX_DEPLOYMENT_TARGET"] = "12.0"
                 else:
                     sdk = os.environ.get("MACOS_SDK")
                     if not sdk:

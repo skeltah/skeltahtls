@@ -32,14 +32,21 @@ def shared_library_name() -> str:
     if sys.platform == "darwin":
         return "tls-client-darwin-arm64.dylib" if machine in ("arm64", "aarch64") else "tls-client-darwin-amd64.dylib"
 
-    # linux / other unix
-    if machine in ("aarch64", "arm64"):
-        return "tls-client-linux-arm64.so"
-    if machine.startswith("arm"):
-        return "tls-client-linux-armv7.so"
-    if _is_musl():
-        return "tls-client-linux-musl-amd64.so"
-    return "tls-client-linux-amd64.so"
+    # linux / other unix. The machine name is the kernel's, so a 32-bit userland on a
+    # 64-bit kernel (Raspberry Pi OS, i386 containers) reports aarch64 / x86_64; the
+    # pointer size of this interpreter is what decides which library it can load.
+    if machine in ("aarch64", "arm64", "armv8l", "armv8b") or machine.startswith("arm"):
+        return "tls-client-linux-arm64.so" if is_64 else "tls-client-linux-armv7.so"
+    if machine in ("x86_64", "amd64", "i386", "i486", "i586", "i686", "x86"):
+        if not is_64:
+            return "tls-client-linux-386.so"
+        if _is_musl():
+            return "tls-client-linux-musl-amd64.so"
+        return "tls-client-linux-amd64.so"
+    raise OSError(
+        f"skeltahtls has no tls-client library for {sys.platform}/{platform.machine()}; "
+        f"build one (scripts/build_binaries.py) and point {ENV_OVERRIDE} at it"
+    )
 
 
 def shared_library_path() -> Path:
