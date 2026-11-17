@@ -102,9 +102,27 @@ class CookieJar(RequestsCookieJar):
 
     def _remove(self, cookie: Cookie) -> None:
         try:
-            self.clear(cookie.domain, cookie.path, cookie.name)
+            _StdCookieJar.clear(self, cookie.domain, cookie.path, cookie.name)
         except KeyError:
             pass
+
+    def clear(self, domain: Optional[str] = None, path: Optional[str] = None, name: Optional[str] = None) -> None:
+        """Stdlib ``clear``, except that a full (domain, path, name) matches by identity.
+
+        The stdlib parser calls ``clear(domain, path, name)`` when a response deletes a
+        cookie (``Max-Age=0`` / ``Expires`` in the past). It looks the domain up verbatim,
+        so ``Domain=.example.com`` would miss a cookie stored as ``example.com`` - here
+        both spellings are the same cookie.
+        """
+        if domain is None or path is None or name is None:
+            return _StdCookieJar.clear(self, domain, path, name)
+        n_domain = _norm_domain(domain)
+        targets = [c for c in list(self) if c.name == name and (c.path or "/") == (path or "/")
+                   and _norm_domain(c.domain) == n_domain]
+        if not targets:
+            raise KeyError(name)
+        for c in targets:
+            self._remove(c)
 
     # ------------------------------------------------------------------ friendly API
 

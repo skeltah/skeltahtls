@@ -218,17 +218,11 @@ class RequestsCookieJar(CookieJar, MutableMapping):
         return paths
 
     def multiple_domains(self):
-        """Returns True if there are multiple domains in the jar.
-        Returns False otherwise.
+        """Returns True if the cookies in the jar belong to more than one domain.
 
         :rtype: bool
         """
-        domains = []
-        for cookie in iter(self):
-            if cookie.domain is not None and cookie.domain in domains:
-                return True
-            domains.append(cookie.domain)
-        return False  # there is only one domain in jar
+        return len({cookie.domain for cookie in iter(self)}) > 1
 
     def get_dict(self, domain=None, path=None):
         """Takes as an argument an optional domain and path and returns a plain
@@ -439,8 +433,14 @@ def extract_cookies_to_jar(
         cookie_jar: RequestsCookieJar,
         response_headers: dict
 ) -> RequestsCookieJar:
-    response_cookie_jar = cookiejar_from_dict({})
+    """Apply the response's Set-Cookie headers to ``cookie_jar`` and return a jar with
+    just the cookies this response set.
 
+    The headers are applied to the session jar directly rather than parsed into a fresh
+    jar and merged: a cookie the server deletes (``Max-Age=0`` or an ``Expires`` in the
+    past) is removed by the jar that parses it, so a merge never saw the deletion and the
+    old value kept being sent.
+    """
     req = MockRequest(request_url, request_headers)
     # mimic HTTPMessage
     http_message = HTTPMessage()
@@ -451,7 +451,8 @@ def extract_cookies_to_jar(
                 (header_name, header_value)
             )
     res = MockResponse(http_message)
-    response_cookie_jar.extract_cookies(res, req)
 
-    merge_cookies(cookie_jar, response_cookie_jar)
+    response_cookie_jar = cookie_jar.__class__() if hasattr(cookie_jar, "export") else cookiejar_from_dict({})
+    response_cookie_jar.extract_cookies(res, req)
+    cookie_jar.extract_cookies(res, req)
     return response_cookie_jar

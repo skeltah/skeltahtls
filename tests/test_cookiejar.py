@@ -101,3 +101,71 @@ def test_stdlib_set_cookie_path_still_works():
     j = CookieJar()
     j.set_cookie(create_cookie("a", "1", domain=".example.com"))
     assert j["a"] == "1"
+
+
+def _apply(jar, url, *set_cookie):
+    return extract_cookies_to_jar(url, CaseInsensitiveDict(), jar, {"Set-Cookie": list(set_cookie)})
+
+
+def test_server_deletes_a_cookie_with_max_age_0():
+    j = CookieJar()
+    _apply(j, "https://example.com/", "sid=abc; Path=/")
+    assert j.get("sid") == "abc"
+    response_jar = _apply(j, "https://example.com/", "sid=deleted; Max-Age=0; Path=/")
+    assert "sid" not in j
+    assert "sid" not in response_jar
+
+
+def test_server_deletes_a_cookie_with_a_past_expires():
+    j = CookieJar()
+    _apply(j, "https://example.com/", "sid=abc; Path=/")
+    _apply(j, "https://example.com/", "sid=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/")
+    assert "sid" not in j
+
+
+def test_deletion_matches_regardless_of_the_leading_dot():
+    j = CookieJar()
+    j.set("datadome", "abc", domain="example.com")
+    _apply(j, "https://www.example.com/", "datadome=; Max-Age=0; Domain=.example.com; Path=/")
+    assert "datadome" not in j
+
+
+def test_deleting_one_cookie_keeps_the_others():
+    j = CookieJar()
+    _apply(j, "https://example.com/", "a=1; Path=/", "b=2; Path=/")
+    _apply(j, "https://example.com/", "a=; Max-Age=0; Path=/", "c=3; Path=/")
+    assert j.to_dict() == {"b": "2", "c": "3"}
+
+
+def test_delete_then_set_in_one_response_keeps_the_new_value():
+    j = CookieJar()
+    _apply(j, "https://example.com/", "sid=old; Path=/")
+    _apply(j, "https://example.com/", "sid=; Max-Age=0; Path=/", "sid=new; Path=/")
+    assert j.get("sid") == "new"
+
+
+def test_response_jar_holds_only_what_this_response_set():
+    j = CookieJar()
+    j.set("old", "1", domain="example.com")
+    response_jar = _apply(j, "https://example.com/", "new=2; Path=/")
+    assert response_jar.to_dict() == {"new": "2"}
+    assert j.to_dict() == {"old": "1", "new": "2"}
+
+
+def test_stdlib_clear_still_works():
+    j = CookieJar()
+    j.set("a", "1", domain=".example.com")
+    j.set("b", "2", domain="other.com")
+    j.clear(".example.com")  # domain only: stdlib behaviour, exact key
+    assert {c.name for c in j} == {"b"}
+    j.clear()
+    assert len(j) == 0
+
+
+def test_multiple_domains():
+    j = CookieJar()
+    j.set("a", "1", domain="example.com")
+    j.set("b", "2", domain="example.com")
+    assert j.multiple_domains() is False
+    j.set("c", "3", domain="other.com")
+    assert j.multiple_domains() is True
