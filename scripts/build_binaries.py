@@ -87,8 +87,7 @@ def build_in_docker(name: str, src: Path, tmp: Path, go_version: str, out_name: 
         "-v", f"{src}:/w", "-v", f"{toolchain}:/tc", "-v", f"{modcache}:/gomod", "-w", "/w/cffi_dist",
         "-e", "GOMODCACHE=/gomod", "-e", "GOTOOLCHAIN=local", "-e", "GOFLAGS=-mod=mod",
         "-e", "CGO_ENABLED=1", "-e", f"GOOS={goos}", "-e", f"GOARCH={goarch}",
-        "-e", "PATH=/tc/go/bin:/usr/local/bin:/usr/bin:/bin",
-        image, "go", "build", "-buildvcs=false", "-trimpath", "-ldflags=-s -w", "-buildmode=c-shared",
+        image, "/tc/go/bin/go", "build", "-buildvcs=false", "-trimpath", "-ldflags=-s -w", "-buildmode=c-shared",
         "-o", f"/w/cffi_dist/dist/{out_name}", ".",
     ], check=False)
 
@@ -136,6 +135,7 @@ def main() -> int:
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"files": {}}
     manifest.setdefault("files", {})
 
+    failed = []
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "tls-client"
         run(["git", "clone", "-q", "--depth", "1", "--branch", ref, REPO, str(src)])
@@ -165,6 +165,7 @@ def main() -> int:
             if name in DOCKER_IMAGES:
                 if not shutil.which("docker"):
                     print(f"   skipped: needs docker ({DOCKER_IMAGES[name][0]})")
+                    failed.append((name, "skipped: needs docker"))
                     continue
                 res = build_in_docker(name, src, Path(tmp), go_version, out.name)
                 toolchain_note = f"gcc in {DOCKER_IMAGES[name][0]}"
@@ -172,6 +173,7 @@ def main() -> int:
                 env["CC"], env["CXX"] = f"{zig} cc -target {zig_target}", f"{zig} c++ -target {zig_target}"
             elif goos != "darwin":
                 print("   skipped: zig required for cross compiling this target")
+                failed.append((name, "skipped: zig required"))
                 continue
             if goos == "darwin":
                 if platform.system() == "Darwin":
@@ -185,6 +187,7 @@ def main() -> int:
                     sdk = os.environ.get("MACOS_SDK")
                     if not sdk:
                         print("   skipped: set MACOS_SDK=/path/to/MacOSX.sdk (or run on macOS) to build darwin targets")
+                        failed.append((name, "skipped: needs MACOS_SDK or a Mac"))
                         continue
                     env["CGO_CFLAGS"] = f"-isysroot {sdk}"
                     env["CGO_LDFLAGS"] = f"-isysroot {sdk} -F{sdk}/System/Library/Frameworks"
@@ -194,7 +197,9 @@ def main() -> int:
                 native_mac = goos == "darwin" and platform.system() == "Darwin"
                 toolchain_note = "clang" if native_mac else f"zig {zig_version}"
             if res.returncode != 0:
-                print("   FAILED:\n" + "\n".join("   " + l for l in (res.stderr or res.stdout).splitlines()[-15:]))
+                tail = (res.stderr or res.stdout).splitlines()[-15:]
+                print("   FAILED:\n" + "\n".join("   " + l for l in tail))
+                failed.append((name, "\n".join(tail)))
                 continue
             DEP_DIR.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(tmp_out, out)
@@ -215,7 +220,13 @@ def main() -> int:
         print("NOTE: the bundled libraries are not all the same version: " + ", ".join(sorted(versions)))
     MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"manifest written: {MANIFEST}")
-    return 0
+    for name, why in failed:
+        print(f"NOT BUILT: {name}: {why.splitlines()[0] if why else ''}")
+        if os.environ.get("GITHUB_ACTIONS"):
+            # an annotation is readable on the run page without the log
+            message = why.replace("%", "%25").replace("\n", "%0A")
+            print(f"::error title=build {name} failed::{message}")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
