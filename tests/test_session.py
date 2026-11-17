@@ -109,3 +109,29 @@ def test_proxy_resolution():
     assert s._resolve_proxy({"https": "http://h:2"}) == "http://h:2"
     assert s._resolve_proxy({"http": "http://h:3"}) == "http://h:3"
     assert Session()._resolve_proxy(None) == ""
+
+
+def test_bare_chromium_ja3_gets_grease_in_the_payload():
+    bare = "771,4865-4866,65281-16-17613-51,4588-29,0"
+    with Session(ja3_string=bare) as s:
+        ja3 = s._custom_tls_client()["ja3String"]
+    assert ja3 == "771,2570-4865-4866,2570-65281-16-17613-51-2570,2570-4588-29,0"
+    # opting out of the Chrome fill-in leaves the string alone
+    with Session(ja3_string=bare, fill_custom_with_chrome_defaults=False) as s:
+        assert s._custom_tls_client()["ja3String"] == bare
+
+
+@pytest.mark.parametrize("ja3", [
+    "771,4865,0-10-11,29,0",                                    # no ALPS: not Chromium (Firefox)
+    "771,2570-4865,2570-65281-17613-2570,2570-29,0",            # already has GREASE
+    "771,4865,65281-17613,29,0,extra",                          # not a ja3
+])
+def test_other_ja3s_are_left_alone(ja3):
+    assert P.with_chrome_grease(ja3) == ja3
+
+
+def test_grease_values():
+    greases = [0x0A0A + 0x1010 * i for i in range(16)]
+    assert all(P.is_grease(g) for g in greases)
+    assert not any(P.is_grease(v) for v in (0, 29, 4588, 65281, 0x0A1A, 0x1A0A))
+

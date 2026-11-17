@@ -14,9 +14,9 @@ PEET = "https://tls.peet.ws/api/all"
 QUIC_HOST = "https://cloudflare-quic.com/"      # advertises alt-svc h3
 NO_QUIC_HOST = "https://httpbingo.org/get"      # does not, so an h3 race falls back to h2
 
-# Google Chrome 156.0.8078.48 on Windows, captured from tls.browserleaks.com/json.
-# chrome_152 is still the newest profile upstream ships, and these values say it is still
-# the right one: Chrome 153-156 did not change the ClientHello.
+# Google Chrome 156.0.8078.48 on Windows, captured from tls.browserleaks.com/json and
+# tls.peet.ws. chrome_154 (the newest profile upstream ships) reproduces it: Chrome 153-156
+# kept the 152 ClientHello and only started sending the trust anchors sorted (154+).
 CHROME = {
     "ja4": "t13d1517h2_8daaf6152771_cb7bf5808d99",
     "ja4_r": (
@@ -28,6 +28,7 @@ CHROME = {
         "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,"
         "0-5-10-11-13-16-18-23-27-35-43-45-51-17613-51764-65037-65281,4588-29-23-24,0"
     ),
+    "peetprint_hash": "fc97c1cdfb1409c9a9326c1b726d1dee",
     "akamai_hash": "52d84b11737d980aef856699f885ca86",
     "akamai_text": "1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p",
     "user_agent": (
@@ -36,13 +37,14 @@ CHROME = {
     ),
 }
 
+# the request headers of that capture, in the order Chrome sent them
 CHROME_HEADERS = {
-    "sec-ch-ua": '"Chromium";v="156", "Not?A_Brand";v="24", "Google Chrome";v="156"',
+    "sec-ch-ua": '"Not:A-Brand";v="8", "Chromium";v="156", "Google Chrome";v="156"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"Windows"',
     "upgrade-insecure-requests": "1",
     "user-agent": CHROME["user_agent"],
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,"
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,"
               "image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "sec-fetch-site": "none",
     "sec-fetch-mode": "navigate",

@@ -10,6 +10,7 @@ import pytest
 
 from conftest import BROWSERLEAKS, CHROME, CHROME_HEADERS, PEET, fetch, headers_frame
 from skeltahtls import AsyncSession, Session
+from skeltahtls import profiles as P
 
 pytestmark = pytest.mark.network
 
@@ -19,6 +20,21 @@ def test_default_profile_matches_real_chrome():
         d = fetch(BROWSERLEAKS, s, headers=CHROME_HEADERS)
     for field in ("ja4", "ja4_r", "ja3n_text", "akamai_hash", "akamai_text"):
         assert d[field] == CHROME[field], field
+
+
+def _trust_anchors(peet_tls):
+    return next(e for e in peet_tls["extensions"] if "51764" in e["name"])["data"]
+
+
+def test_default_profile_matches_real_chrome_on_peet():
+    """peetprint covers what ja4 leaves out (GREASE, sigalgs order, ...); the trust anchors
+    are compared byte for byte: Chrome 154+ sends them sorted."""
+    with Session() as s:
+        d = fetch(PEET, s, headers=CHROME_HEADERS)
+    assert d["tls"]["ja4"] == CHROME["ja4"]
+    assert d["tls"]["peetprint_hash"] == CHROME["peetprint_hash"]
+    assert d["http2"]["akamai_fingerprint_hash"] == CHROME["akamai_hash"]
+    assert _trust_anchors(d["tls"]) == P.CHROME_TRUST_ANCHORS_PAYLOAD
 
 
 def test_header_order_follows_the_request_and_pseudo_headers_are_chromes():
@@ -45,6 +61,15 @@ def test_custom_ja3_reaches_the_same_fingerprint():
         d = fetch(BROWSERLEAKS, s)
     assert d["ja4"] == CHROME["ja4"]
     assert d["akamai_hash"] == CHROME["akamai_hash"]
+
+
+def test_bare_ja3_gets_chromes_grease_back():
+    """Sites print ja3 without GREASE; without it peetprint is not Chrome's."""
+    with Session(ja3_string=CHROME["ja3n_text"], random_tls_extension_order=True) as s:
+        d = fetch(PEET, s)
+    assert d["tls"]["ja4"] == CHROME["ja4"]
+    assert d["tls"]["peetprint_hash"] == CHROME["peetprint_hash"]
+    assert _trust_anchors(d["tls"]) == P.CHROME_TRUST_ANCHORS_PAYLOAD
 
 
 def test_cookies_only_go_to_matching_hosts():

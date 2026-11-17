@@ -113,14 +113,14 @@ class Session:
 
     ``client_identifier`` is one of the profiles built into the bundled tls-client library;
     editors complete the values because it is typed as a Literal. The default is the newest
-    Chrome (``skeltahtls.CHROME_LATEST``, currently chrome_152)::
+    Chrome (``skeltahtls.CHROME_LATEST``, currently chrome_154)::
 
         Session()                                        # newest Chrome
         Session(client_identifier="firefox_148")
         Session(client_identifier=Profiles.CHROME_144)   # same strings as attributes
         Session(client_identifier=Profiles.LATEST_CHROME)
 
-    Families: ``chrome_103..152`` (``_PSK`` variants resume with a pre-shared key),
+    Families: ``chrome_103..154`` (``_PSK`` variants resume with a pre-shared key),
     ``brave_146``, ``firefox_102..148``, ``safari_15_6_1``/``safari_16_0``,
     ``safari_ios_*``/``safari_ipad_*``, ``opera_89..91``, ``okhttp4_android_7..13`` and the
     app profiles (``zalando_*``, ``nike_*``, ``mms_ios*``, ``mesh_*``, ``confirmed_*``,
@@ -543,8 +543,12 @@ class Session:
 
     def _custom_tls_client(self) -> Dict[str, Any]:
         """customTlsClient payload. Fields you leave None are filled with Chrome values
-        (only where the ja3 actually lists the matching extension), so a bare ja3_string works."""
+        (only where the ja3 actually lists the matching extension), and a Chromium ja3
+        without GREASE gets it back (see ``profiles.with_chrome_grease``), so a ja3 copied
+        from a fingerprinting site reproduces the browser."""
         ja3 = self.ja3_string or ""
+        if self.fill_custom_with_chrome_defaults:
+            ja3 = _profiles.with_chrome_grease(ja3)
         parts = ja3.split(",")
         ext_ids = {int(e) for e in parts[2].split("-") if e} if len(parts) > 2 else set()
         curve_ids = {int(c) for c in parts[3].split("-") if c} if len(parts) > 3 else set()

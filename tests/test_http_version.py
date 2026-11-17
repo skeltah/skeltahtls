@@ -96,7 +96,7 @@ def test_warns_when_the_profile_cannot_back_the_choice():
     assert "chrome_133" in P.PROFILES_WITH_H3_ALPN
     with pytest.warns(UserWarning, match="changes its ClientHello"):
         Session(client_identifier="chrome_133", http_version=2)
-    # chrome_152 has no HTTP/3 settings, so an h3 connection is not browser-accurate
+    # chrome_154 has no HTTP/3 settings, so an h3 connection is not browser-accurate
     assert P.CHROME_LATEST not in P.PROFILES_WITH_HTTP3_SETTINGS
     with pytest.warns(UserWarning, match="no HTTP/3 settings"):
         Session(http_version=3)

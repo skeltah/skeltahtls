@@ -1,4 +1,4 @@
-"""Client profiles built into the bundled tls-client library (v1.16.0).
+"""Client profiles built into the bundled tls-client library (master after v1.18.1).
 
 Generated from bogdanfinn/tls-client by scripts/gen_profiles.py - do not hand-edit
 anything above the marker line.
@@ -42,12 +42,15 @@ ClientIdentifiers = Literal[
     "chrome_150_PSK",
     "chrome_152",
     "chrome_152_PSK",
+    "chrome_154",
+    "chrome_154_PSK",
     # brave
     "brave_146",
     "brave_146_PSK",
     # safari
     "safari_15_6_1",
     "safari_16_0",
+    "safari_27_2",
     "safari_ipad_15_6",
     "safari_ios_15_5",
     "safari_ios_15_6",
@@ -116,8 +119,8 @@ ClientIdentifier = Union[ClientIdentifiers, str]
 
 ALL_IDENTIFIERS: Tuple[str, ...] = ClientIdentifiers.__args__  # type: ignore[attr-defined]
 
-CHROME_LATEST: Final = "chrome_152"
-CHROME_LATEST_PSK: Final = "chrome_152_PSK"
+CHROME_LATEST: Final = "chrome_154"
+CHROME_LATEST_PSK: Final = "chrome_154_PSK"
 FIREFOX_LATEST: Final = "firefox_148"
 DEFAULT_PROFILE: Final = CHROME_LATEST
 
@@ -185,6 +188,8 @@ class Profiles:
     CHROME_150_PSK: Final = "chrome_150_PSK"
     CHROME_152: Final = "chrome_152"
     CHROME_152_PSK: Final = "chrome_152_PSK"
+    CHROME_154: Final = "chrome_154"
+    CHROME_154_PSK: Final = "chrome_154_PSK"
 
     # brave
     BRAVE_146: Final = "brave_146"
@@ -193,6 +198,7 @@ class Profiles:
     # safari
     SAFARI_15_6_1: Final = "safari_15_6_1"
     SAFARI_16_0: Final = "safari_16_0"
+    SAFARI_27_2: Final = "safari_27_2"
     SAFARI_IPAD_15_6: Final = "safari_ipad_15_6"
     SAFARI_IOS_15_5: Final = "safari_ios_15_5"
     SAFARI_IOS_15_6: Final = "safari_ios_15_6"
@@ -298,8 +304,9 @@ def builtin_pseudo_header_order(identifier: str) -> Tuple[str, ...]:
     return CHROME_PSEUDO_HEADER_ORDER
 
 # ---------------------------------------------------------------------------------------------
-# Chrome 152 values used to fill in whatever a custom (ja3_string) client does not specify.
-# Taken from bogdanfinn/tls-client profiles/internal_browser_profiles.go (Chrome_152).
+# Chrome 154 values used to fill in whatever a custom (ja3_string) client does not specify.
+# Taken from bogdanfinn/tls-client profiles/internal_browser_profiles.go (Chrome_154), which
+# is Chrome_152 with the trust anchors sorted; checked against a Chrome 156 capture.
 # ---------------------------------------------------------------------------------------------
 CHROME_H2_SETTINGS = {
     "HEADER_TABLE_SIZE": 65536,
@@ -320,12 +327,13 @@ CHROME_SIGNATURE_ALGORITHMS = [
 CHROME_ALPN = ["h2", "http/1.1"]
 CHROME_ALPS = ["h2"]
 CHROME_CERT_COMPRESSION = ["brotli"]
-# wire bytes of the trust_anchors (51764 / 0xca34) extension as captured from Chrome 152
+# wire bytes of the trust_anchors (51764 / 0xca34) extension as captured from Chrome 156.
+# Chrome 154+ sends the IDs sorted; 150-152 shuffled them per connection.
 CHROME_TRUST_ANCHORS_PAYLOAD = (
-    "00b80582df13020108839a648c9b2d010c08839a648c9b2d010704d679090c08839a648c9b2d010a04d679090b08839a64"
-    "8c9b2d010d0582df13020e08839a648c9b2d010b04d67909050582df13020d0582df13021404d679090404d679090804d6"
-    "79090d04d679090a04d679090708839a648c9b2d011204d67909010582df13020608839a648c9b2d01080582df13021208"
-    "839a648c9b2d011304d679090f0582df13021308839a648c9b2d01090582df13020f04d6790906"
+    "00b80582df1302010582df1302060582df13020d0582df13020e0582df13020f0582df1302120582df1302130582df130214"
+    "08839a648c9b2d010708839a648c9b2d010808839a648c9b2d010908839a648c9b2d010a08839a648c9b2d010b08839a648c"
+    "9b2d010c08839a648c9b2d010d08839a648c9b2d011208839a648c9b2d011304d679090104d679090404d679090504d67909"
+    "0604d679090704d679090804d679090a04d679090b04d679090c04d679090d04d679090f"
 )
 
 TRUST_ANCHORS_EXTENSION_ID = 51764
@@ -336,3 +344,40 @@ ALPS_EXTENSION_IDS = (17513, 17613)
 SUPPORTED_VERSIONS_EXTENSION_ID = 43
 SIGNATURE_ALGORITHMS_EXTENSION_ID = 13
 X25519MLKEM768_GROUP_ID = 4588
+
+
+# GREASE values (RFC 8701): 0x0a0a, 0x1a1a, ... 0xfafa. tls-client reads any of them in a
+# ja3 as "a GREASE value here"; 2570 (0x0a0a) is what fingerprinting sites print.
+GREASE_JA3_VALUE = 2570
+
+
+def is_grease(value: int) -> bool:
+    return value & 0x0F0F == 0x0A0A and value >> 8 == value & 0xFF
+
+
+def with_chrome_grease(ja3: str) -> str:
+    """Put Chrome's GREASE back into a ja3 string that had it stripped.
+
+    Most sites print ja3 without GREASE (that is the point of the hash), but Chrome sends
+    a GREASE cipher first, a GREASE extension first and last, and a GREASE group first.
+    Without them the ClientHello is not Chrome's: ja4 still matches, peetprint and the
+    raw extension list do not. Only Chromium ja3s are touched (recognised by the ALPS
+    extension, which no other browser sends); a ja3 that already has GREASE anywhere is
+    returned unchanged.
+    """
+    parts = ja3.split(",")
+    if len(parts) != 5:
+        return ja3
+    try:
+        numbers = [int(v) for field in parts[1:4] for v in field.split("-") if v]
+        ext_ids = {int(v) for v in parts[2].split("-") if v}
+    except ValueError:
+        return ja3
+    if any(is_grease(n) for n in numbers) or not ext_ids & set(ALPS_EXTENSION_IDS):
+        return ja3
+    g = str(GREASE_JA3_VALUE)
+    version, ciphers, extensions, curves, point_formats = parts
+    ciphers = f"{g}-{ciphers}" if ciphers else g
+    extensions = f"{g}-{extensions}-{g}" if extensions else g
+    curves = f"{g}-{curves}" if curves else g
+    return ",".join((version, ciphers, extensions, curves, point_formats))

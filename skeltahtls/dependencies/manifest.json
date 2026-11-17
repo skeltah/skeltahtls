@@ -1,7 +1,7 @@
 {
-  "version": "1.17.1",
-  "source": "https://github.com/bogdanfinn/tls-client/tree/e9d6574cd0ac72068138b678f06668c5b296d843",
-  "updated": "2026-10-27T10:08:41+00:00",
+  "version": "1.18.1-2-gbf1ecb2",
+  "source": "https://github.com/bogdanfinn/tls-client/tree/bf1ecb2cbf592645eb36d2010f86a3822ccab862",
+  "updated": "2026-11-17T14:28:41+00:00",
   "files": {
     "tls-client-darwin-arm64.dylib": {
       "source": "https://github.com/bogdanfinn/tls-client/releases/download/v1.16.0/tls-client-darwin-arm64-1.16.0.dylib",
@@ -22,55 +22,64 @@
       "version": "1.16.0"
     },
     "tls-client-windows-amd64.dll": {
-      "version": "1.17.1",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@v1.17.1 (e9d6574cd0ac) with go1.26.3 / zig 0.16.0",
-      "sha256": "ce7929bb2482480610fa337abe642696b08db09b245056bbd5fe31f03bd04ba3",
-      "size": 12891136,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "29b1f509371f74532b5fbceac8c610c01d675bb2a0ffe4d99fd00fabc17a9c55",
+      "size": 12912640,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-windows-386.dll": {
-      "version": "1.17.1",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@v1.17.1 (e9d6574cd0ac) with go1.26.3 / zig 0.16.0",
-      "sha256": "ef4903760c69f7eb4ebcf0cc2133e6f6439b5aa5735c38468f540d3d2e95cd4d",
-      "size": 12505600,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "03561f0a7dc143b41fc4c173c412ff6b20a92070f334dcae963fd32ab40091cf",
+      "size": 12525056,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-amd64.so": {
-      "version": "1.17.1",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@v1.17.1 (e9d6574cd0ac) with go1.26.3 / zig 0.16.0",
-      "sha256": "8ccc690d677a62bafbfb6f935e08888a5fe364e5ee53a2c64c1dddea78c9d9f6",
-      "size": 14959312,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "728552fd82d10c84db8da84ff50949508fd65fe781bf53751b42518d47989df1",
+      "size": 14984608,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-musl-amd64.so": {
-      "version": "1.17.1",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@v1.17.1 (e9d6574cd0ac) with go1.26.3 / zig 0.16.0",
-      "sha256": "8fa46024024d1d4fd1802cbdebb755c7a84aa9bfea7a065797d54fcfcafd66dc",
-      "size": 14953840,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "bfa0e3ac0ec7354d3f4a756a22d76075493feedd9ba41cbee51b2e7361debb00",
+      "size": 14979168,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-arm64.so": {
-      "version": "1.17.1",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@v1.17.1 (e9d6574cd0ac) with go1.26.3 / zig 0.16.0",
-      "sha256": "b6b419c247de0de47d2084f8f040308f38139f43c940a1c9078a155ed939baf7",
-      "size": 13992560,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "950907abb6327947a052375d8da1a3e76d50777e74a61cf897508008150089bb",
+      "size": 14015904,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
     },
     "tls-client-linux-armv7.so": {
-      "version": "1.17.1",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@v1.17.1 (e9d6574cd0ac) with go1.26.3 / zig 0.16.0",
-      "sha256": "bfab3fdc23685b1cc1b2b8ea380e49d5b2215d16738b05413d1b1956e63815f6",
-      "size": 14736348,
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "6b89004d1e8580b5c8562e977054fb0f6cdea7c002162c605089c7561ef3f97e",
+      "size": 14762264,
+      "features": {
+        "custom_client_grease_mldsa_sigalgs": true
+      }
+    },
+    "tls-client-linux-386.so": {
+      "version": "1.18.1-2-gbf1ecb2",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.0 / zig 0.16.0",
+      "sha256": "f18169a9bea731ab0cef526bfb91306b72f5b83e694954112b1d1ac575941058",
+      "size": 13855956,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }

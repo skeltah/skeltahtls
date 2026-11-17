@@ -15,7 +15,7 @@ def test_annotation_carries_every_identifier():
     optional_literal = typing.get_args(hints["client_identifier"])  # (Literal[...], NoneType)
     literal_values = typing.get_args(optional_literal[0])
     assert set(literal_values) == set(ALL_IDENTIFIERS)
-    assert len(literal_values) == len(ALL_IDENTIFIERS) == 83
+    assert len(literal_values) == len(ALL_IDENTIFIERS) == 86
 
 
 def test_http_version_annotation_carries_every_accepted_value():
@@ -36,15 +36,16 @@ def test_py_typed_marker_ships():
 def test_profiles_namespace_matches_the_identifier_list():
     attrs = {v for k, v in vars(Profiles).items() if not k.startswith("_") and isinstance(v, str)}
     assert attrs == set(ALL_IDENTIFIERS)
-    assert Profiles.CHROME_152 == "chrome_152"
-    assert Profiles.LATEST_CHROME == P.CHROME_LATEST == "chrome_152"
+    assert Profiles.CHROME_154 == "chrome_154"
+    assert Profiles.LATEST_CHROME == P.CHROME_LATEST == "chrome_154"
     assert Profiles.LATEST_FIREFOX == P.FIREFOX_LATEST
     # every attribute is usable as-is
     Session(client_identifier=Profiles.LATEST_CHROME).close()
 
 
 def test_find_filters_by_prefix():
-    assert find("chrome_15") == ["chrome_150", "chrome_150_PSK", "chrome_152", "chrome_152_PSK"]
+    assert find("chrome_15") == ["chrome_150", "chrome_150_PSK", "chrome_152", "chrome_152_PSK",
+                                 "chrome_154", "chrome_154_PSK"]
     assert find("CHROME_152") == ["chrome_152", "chrome_152_PSK"]
     assert find("safari_ios")[-1] == "safari_ios_26_0"
     assert find("nope") == []
@@ -54,6 +55,7 @@ def test_find_filters_by_prefix():
 @pytest.mark.parametrize("typo,expected", [
     ("chrome152", "chrome_152"),
     ("chrome_153", "chrome_152"),
+    ("chrome154", "chrome_154"),
     ("Chrome_152", "chrome_152"),
     ("firefox", "firefox_148"),
     ("safari_ios_27", "safari_ios_26_0"),
