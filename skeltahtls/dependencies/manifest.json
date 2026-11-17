@@ -1,11 +1,11 @@
 {
   "version": "1.18.1-2-gbf1ecb2",
   "source": "https://github.com/bogdanfinn/tls-client/tree/bf1ecb2cbf592645eb36d2010f86a3822ccab862",
-  "updated": "2026-11-17T14:37:50+00:00",
+  "updated": "2026-11-17T15:57:38+00:00",
   "files": {
     "tls-client-darwin-arm64.dylib": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig n/a",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / clang",
       "sha256": "6bb280fac50c156cbac42c373255369423d764c789dd5c504fc49eb0ffe64ac3",
       "size": 11668994,
       "features": {
@@ -14,7 +14,7 @@
     },
     "tls-client-darwin-amd64.dylib": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig n/a",
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / clang",
       "sha256": "3e3c636492416538ae16e9ab6042f413be255dce5a1d9d5e47379567116d800c",
       "size": 12513600,
       "features": {
@@ -24,7 +24,7 @@
     "tls-client-windows-amd64.dll": {
       "version": "1.18.1-2-gbf1ecb2",
       "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "730ffbb14a258503626782faaddeea66cc74da4f68fe160bf25847830a66c14f",
+      "sha256": "dcf512d6f69b416488fe8b79073d5d1a963f3ca848ef6a937f669dac2b8fd9a0",
       "size": 12922368,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
@@ -33,7 +33,7 @@
     "tls-client-windows-386.dll": {
       "version": "1.18.1-2-gbf1ecb2",
       "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "94f966b92972175126449d7ae430cf249cae3d9ee38e428a8be32baafebf9f1c",
+      "sha256": "a980b09535c54c5cbefddd93b19baecfddfc182164444dcb8acfddbdc829d5f0",
       "size": 12534272,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
@@ -42,7 +42,7 @@
     "tls-client-linux-amd64.so": {
       "version": "1.18.1-2-gbf1ecb2",
       "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "9ac8d41f1b8dedb022cb5f22a1f30bf651425a1ee12b2184acb7ff64113c515f",
+      "sha256": "b863236da9ebb0500701a995ef897704118ffc99d24c9ad14fbc5728f02f22e1",
       "size": 14992960,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
@@ -51,7 +51,7 @@
     "tls-client-linux-arm64.so": {
       "version": "1.18.1-2-gbf1ecb2",
       "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "992b9d7823e458b9f37b924b2adb6260f661e737d86a13503c61b5c4dc3eab4f",
+      "sha256": "e06930aea91fd31050ced5448b8e7e3922ad32e7fba50f34d8dc592f7cfc1913",
       "size": 14024040,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
@@ -60,7 +60,7 @@
     "tls-client-linux-armv7.so": {
       "version": "1.18.1-2-gbf1ecb2",
       "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "b5904dc9df405a567208398c12b02ca4ac19a1b82e06db2ca62f88a07d59e353",
+      "sha256": "b27e8a11815bd9317c414ad52fd98bd9b9412cd46d8edc8e2dbf2f32cb3918bf",
       "size": 14769864,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
@@ -68,9 +68,9 @@
     },
     "tls-client-linux-386.so": {
       "version": "1.18.1-2-gbf1ecb2",
-      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / zig 0.16.0",
-      "sha256": "15b6fa635835b362c38a06de7664f90019517d1fe152d66a356847e6de17d1cf",
-      "size": 13863252,
+      "source": "built from https://github.com/bogdanfinn/tls-client.git@master (bf1ecb2cbf59) with go1.27.4 / gcc in quay.io/pypa/manylinux2014_i686",
+      "sha256": "b44f4df6a6de6566e73031649959fd10393bf577fc8006e2c59474c012197708",
+      "size": 12883528,
       "features": {
         "custom_client_grease_mldsa_sigalgs": true
       }
